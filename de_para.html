@@ -257,15 +257,56 @@ function similarity(desc,eapDesc){
   return Math.min(1,seqScore*0.25+tokenScore*0.15+subBonus*0.1+recall*0.2+sigScore*0.3);
 }
 
+// Extract meaningful keywords from a context string (ignore dates, numbers, IDs)
+function extractKeywords(ctx){
+  if(!ctx)return'';
+  // Try to extract from known field patterns like "Descrição: XXX" or "Origem: XXX"
+  const fields=[];
+  const descMatch=ctx.match(/Descri[çc][aã]o\s*:\s*([^|]+)/i);
+  if(descMatch)fields.push(descMatch[1].trim());
+  const origemMatch=ctx.match(/Origem\s*:\s*([^|]+)/i);
+  if(origemMatch)fields.push(origemMatch[1].trim());
+  const fornMatch=ctx.match(/Fornecedor\s*:\s*([^|]+)/i);
+  if(fornMatch)fields.push(fornMatch[1].trim());
+  const histMatch=ctx.match(/Hist[oó]rico\s*:\s*([^|]+)/i);
+  if(histMatch)fields.push(histMatch[1].trim());
+  const catMatch=ctx.match(/Categoria\s*:\s*([^|]+)/i);
+  if(catMatch)fields.push(catMatch[1].trim());
+  // If we found structured fields, use them; otherwise use the whole string
+  // but filter out pure numbers, dates, and currency values
+  if(fields.length>0)return fields.join(' ');
+  return ctx.replace(/\b\d[\d.,]*\b/g,' ').replace(/R\$\s*[\d.,\-]+/g,' ').replace(/\d{2}\/\d{2}\/\d{4}/g,' ').replace(/\s+/g,' ').trim();
+}
+
 function suggestOffline(desc,obraFilter,topN=5){
   let data=EAP_DATA;
   if(obraFilter&&obraFilter!=='TODAS')data=data.filter(e=>e.Obra===obraFilter);
+  // Extract meaningful keywords from the description/context
+  const keywords=extractKeywords(desc);
+  const searchText=keywords||desc;
   const results=[];
   data.forEach(item=>{
-    const score=similarity(desc,item.Descricao);
-    if(score>=0.05)results.push({...item,Score:Math.round(score*100)/100});
+    // Score against both the full label and the description
+    const s1=similarity(searchText,item.Descricao);
+    const s2=similarity(searchText,item.Label);
+    const score=Math.max(s1,s2);
+    if(score>=0.03)results.push({...item,Score:Math.round(score*100)/100});
   });
   results.sort((a,b)=>b.Score-a.Score);
+  // If we found nothing, try individual keyword matching as last resort
+  if(results.length===0){
+    const tokens=normalize(searchText).split(' ').filter(t=>t.length>2&&!STOPWORDS.has(t));
+    data.forEach(item=>{
+      const en=normalize(item.Descricao);
+      tokens.forEach(tok=>{
+        if(en.includes(tok)){
+          const existing=results.find(r=>r.Label===item.Label);
+          if(!existing)results.push({...item,Score:0.15});
+        }
+      });
+    });
+    results.sort((a,b)=>b.Score-a.Score);
+  }
   return results.slice(0,topN);
 }
 
@@ -307,31 +348,33 @@ async function callClaudeAPI(descriptions, contexts, obraFilter){
       itemsText=batch.descs.map((d,i)=>(i+1)+'. "'+d+'"').join('\n');
     }
 
-    const contextNote=hasContext?`
-IMPORTANTE: Cada lancamento inclui TODAS as informacoes da linha original da planilha (fornecedor, descricao, valor, centro de custo, etc).
-Use TODAS essas informacoes em conjunto para identificar o item correto da EAP.
-Por exemplo, o nome do fornecedor pode indicar o tipo de servico (ex: "Contabilidade LD" indica despesas contabeis).
-`:'';
+    const prompt=`Voce e um especialista senior em contabilidade e gestao financeira de empreendimentos imobiliarios (SPE/incorporacao).
 
-    const prompt=`Voce e um especialista em contabilidade e gestao de empreendimentos imobiliarios.
-
-Abaixo esta a estrutura de EAP (Estrutura Analitica de Processos / Plano de Contas) de uma empresa:
-
+## ESTRUTURA EAP (Plano de Contas)
+Estas sao TODAS as opcoes disponiveis para classificacao. Formato: Obra | Produto | Item | Descricao:
 ${eapContext}
 
----
-${contextNote}
-Analise os seguintes lancamentos financeiros e sugira para qual item da EAP cada um deve ser apropriado.
-Considere o nome do fornecedor, descricao, categoria e qualquer outra informacao disponivel para fazer a melhor classificacao possivel.
-Para cada lancamento, sugira ate 3 opcoes da EAP, ordenadas da mais provavel para a menos provavel.
+## REGRAS OBRIGATORIAS
+1. Voce DEVE retornar EXATAMENTE ${batch.descs.length} mapeamentos, um para cada lancamento abaixo.
+2. NUNCA pule nenhum lancamento. Mesmo se tiver duvida, sugira a opcao mais provavel com confianca menor.
+3. Para cada lancamento, analise TODAS as informacoes disponiveis: nome do fornecedor/origem, descricao, historico, categoria.
+4. Foque em PALAVRAS-CHAVE para encontrar o item correto da EAP. Exemplos:
+   - "AGUA" ou empresa de saneamento -> CONSUMOS (AGUA, ENERGIA E INTERNET / TELEFONE)
+   - "Contabilidade" ou "contador" -> DESPESAS CONTABEIS
+   - "energia" ou "eletrica" ou "luz" -> CONSUMOS (AGUA, ENERGIA E INTERNET / TELEFONE)
+   - "advogado" ou "juridico" -> DESPESAS JURIDICAS ou CONSULTORIAS JURIDICAS
+   - "corretor" ou "comissao" -> COMISSOES
+   - "IPTU" -> IPTU / ITU / AGUA E ENERGIA DO TERRENO
+   - "cimento", "ferro", "concreto" -> itens de CUSTO OBRA
+   - "registro" ou "cartorio" -> ITBI / ISTI / REGISTRO ou DESPESAS CARTORIOS
+5. O campo "numero" no JSON de resposta DEVE ser o numero exato do lancamento (1, 2, 3...).
 
-LANCAMENTOS:
+## LANCAMENTOS PARA CLASSIFICAR
 ${itemsText}
 
----
-
-Responda EXCLUSIVAMENTE no formato JSON abaixo (sem markdown, sem texto adicional). O campo "numero" deve corresponder ao numero do lancamento acima:
-{"mapeamentos":[{"numero":1,"descricao_original":"texto principal do lancamento","sugestoes":[{"obra":"SIGLA","produto":"codigo produto","item":"codigo item","descricao_eap":"descricao do item EAP","confianca":0.95,"justificativa":"breve explicacao de porque este item e adequado"}]}]}`;
+## FORMATO DE RESPOSTA
+Responda APENAS com JSON puro (sem markdown, sem crases, sem texto antes ou depois):
+{"mapeamentos":[{"numero":1,"descricao_original":"descricao resumida","sugestoes":[{"obra":"SIGLA","produto":"codigo","item":"codigo","descricao_eap":"descricao EAP","confianca":0.95,"justificativa":"explicacao curta"}]}]}`;
 
     // Retry logic: up to 2 retries per batch
     let success=false;
@@ -370,22 +413,40 @@ Responda EXCLUSIVAMENTE no formato JSON abaixo (sem markdown, sem texto adiciona
           if(m)parsed=JSON.parse(m[0]);else throw new Error('Resposta invalida da API');
         }
 
-        // Match results by number (index in batch) or by descricao_original
-        (parsed.mapeamentos||[]).forEach(item=>{
-          const sugs=(item.sugestoes||[]).map(s=>({
+        // Match results by number (index in batch)
+        const mappings=parsed.mapeamentos||[];
+        mappings.forEach(item=>{
+          const sugs=(item.sugestoes||[]).filter(s=>s&&s.obra).map(s=>({
             Label:s.obra+' | '+(s.produto||'')+' | '+s.item+' | '+s.descricao_eap,
             Obra:s.obra,Produto:s.produto||'',Item:s.item,
             Descricao:s.descricao_eap,Score:s.confianca||0.5,
             Justificativa:s.justificativa||''
           }));
+          if(!sugs.length)return;
           // Match by number first (most reliable)
-          if(item.numero&&item.numero>=1&&item.numero<=batch.descs.length){
-            allResults[batch.descs[item.numero-1]]=sugs;
-          }else{
-            // Fallback: match by description text
-            allResults[item.descricao_original]=sugs;
+          const num=parseInt(item.numero);
+          if(num>=1&&num<=batch.descs.length){
+            allResults[batch.descs[num-1]]=sugs;
+          }else if(item.descricao_original){
+            // Fallback: try to match by description text
+            const matchKey=batch.descs.find(d=>d===item.descricao_original);
+            if(matchKey)allResults[matchKey]=sugs;
           }
         });
+        // If API returned results in order without numbers, map by position
+        if(mappings.length===batch.descs.length){
+          mappings.forEach((item,i)=>{
+            if(!allResults[batch.descs[i]]){
+              const sugs=(item.sugestoes||[]).filter(s=>s&&s.obra).map(s=>({
+                Label:s.obra+' | '+(s.produto||'')+' | '+s.item+' | '+s.descricao_eap,
+                Obra:s.obra,Produto:s.produto||'',Item:s.item,
+                Descricao:s.descricao_eap,Score:s.confianca||0.5,
+                Justificativa:s.justificativa||''
+              }));
+              if(sugs.length)allResults[batch.descs[i]]=sugs;
+            }
+          });
+        }
         success=true;
       }catch(e){
         console.error('Lote '+(b+1)+', tentativa '+(attempt+1)+':',e);
@@ -402,6 +463,22 @@ Responda EXCLUSIVAMENTE no formato JSON abaixo (sem markdown, sem texto adiciona
       }
     }
   }
+
+  // Post-processing: ensure every description has at least one suggestion
+  const missed=descriptions.filter(d=>!allResults[d]||allResults[d].length===0);
+  if(missed.length>0){
+    console.log('Post-processing '+missed.length+' itens sem resultado da API...');
+    missed.forEach(desc=>{
+      const idx=descriptions.indexOf(desc);
+      const ctx=contexts[idx]||desc;
+      const keywords=extractKeywords(ctx);
+      const offline=suggestOffline(keywords||ctx,obraFilter,3);
+      if(offline.length>0){
+        allResults[desc]=offline.map(s=>({...s,Justificativa:'(similaridade textual - IA nao retornou resultado)'}));
+      }
+    });
+  }
+
   return allResults;
 }
 
