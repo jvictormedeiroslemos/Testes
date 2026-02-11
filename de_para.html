@@ -28,6 +28,7 @@ button{padding:10px 24px;background:#1f77b4;color:#fff;border:none;border-radius
 button:hover{background:#1a6aa5}
 button.secondary{background:#444}
 button.secondary:hover{background:#555}
+button:disabled{opacity:.5;cursor:not-allowed}
 .btn-row{margin:15px 0;display:flex;gap:10px;flex-wrap:wrap}
 table{width:100%;border-collapse:collapse;margin:15px 0;font-size:13px}
 th{background:#1a1b26;color:#1f77b4;padding:10px;text-align:left;border-bottom:2px solid #1f77b4;position:sticky;top:0}
@@ -35,11 +36,8 @@ td{padding:8px 10px;border-bottom:1px solid #333}
 tr:hover{background:#1a1b26}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .card{background:#1a1b26;border:1px solid #333;border-radius:8px;padding:20px}
-.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600}
-.badge-ok{background:#1a4731;color:#4ade80}
-.badge-wait{background:#4a3728;color:#fb923c}
 .score-bar{height:6px;background:#333;border-radius:3px;overflow:hidden;width:100px;display:inline-block;vertical-align:middle;margin-left:8px}
-.score-fill{height:100%;background:#1f77b4;border-radius:3px}
+.score-fill{height:100%;border-radius:3px}
 .suggestion{background:#262730;border:1px solid #444;border-radius:6px;padding:12px;margin:8px 0;cursor:pointer;transition:.2s}
 .suggestion:hover{border-color:#1f77b4;background:#1a1b26}
 .suggestion.selected{border-color:#4ade80;background:#1a2e1a}
@@ -58,6 +56,13 @@ tr:hover{background:#1a1b26}
 .upload-area:hover{border-color:#1f77b4;background:#1a1b26}
 .upload-area input{display:none}
 .hidden{display:none}
+.progress{width:100%;height:8px;background:#333;border-radius:4px;overflow:hidden;margin:10px 0}
+.progress-fill{height:100%;background:#1f77b4;border-radius:4px;transition:width .3s}
+.radio-group{display:flex;gap:10px;margin:10px 0}
+.radio-group label{display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 16px;background:#262730;border:1px solid #444;border-radius:6px;color:#ccc;font-size:14px}
+.radio-group label:hover{border-color:#1f77b4}
+.radio-group input:checked+span{color:#1f77b4;font-weight:600}
+.radio-group input{display:none}
 @media(max-width:768px){.grid{grid-template-columns:1fr}.filter-row{flex-direction:column}}
 </style>
 </head>
@@ -77,17 +82,27 @@ tr:hover{background:#1a1b26}
 <!-- TAB 0: IA -->
 <div class="section active" id="tab0">
 <h2>Mapeamento Inteligente</h2>
-<p style="color:#aaa;margin-bottom:20px">Digite descricoes ou faca upload de uma planilha. O sistema analisa e sugere o mapeamento automaticamente.</p>
-<div class="grid">
-<div class="card">
+
+<h3>Modo de analise</h3>
+<div class="radio-group">
+<label><input type="radio" name="aiMode" value="api" checked><span>Claude API (recomendado ~95% acerto)</span></label>
+<label><input type="radio" name="aiMode" value="offline"><span>Similaridade Textual (offline, sem API)</span></label>
+</div>
+
+<div id="apiKeyArea">
+<label>Anthropic API Key:</label>
+<input type="password" id="apiKey" placeholder="sk-ant-api03-...">
+<p style="font-size:12px;color:#666;margin-top:4px">Obtenha em console.anthropic.com. A chave nao e armazenada no servidor.</p>
+</div>
+
 <h3>Fonte dos lancamentos</h3>
 <div style="display:flex;gap:10px;margin:10px 0">
-<button onclick="setAISource('text')" id="btnSrcText" class="">Digitar texto</button>
+<button onclick="setAISource('text')" id="btnSrcText">Digitar texto</button>
 <button onclick="setAISource('file')" id="btnSrcFile" class="secondary">Upload planilha</button>
 </div>
 <div id="aiTextArea">
 <label>Descricoes dos lancamentos (uma por linha):</label>
-<textarea id="aiText" rows="8" placeholder="Ex:&#10;Pagamento energia eletrica obra&#10;Comissao corretor Joao&#10;Nota fiscal cimento 50 sacos&#10;Honorarios advocaticios"></textarea>
+<textarea id="aiText" rows="8" placeholder="Ex:&#10;Pagamento energia eletrica obra&#10;Comissao corretor Joao&#10;Nota fiscal cimento 50 sacos&#10;Honorarios advocaticios&#10;Taxa de administracao&#10;IPTU terreno lote 5"></textarea>
 </div>
 <div id="aiFileArea" class="hidden">
 <div class="upload-area" onclick="document.getElementById('aiFileInput').click()">
@@ -101,17 +116,24 @@ tr:hover{background:#1a1b26}
 <div id="aiFileInfo" style="margin-top:10px;color:#aaa;font-size:13px"></div>
 </div>
 </div>
-</div>
-<div class="card">
-<h3>Configuracao</h3>
+
+<div class="grid" style="margin-top:15px">
+<div>
 <label>Filtrar sugestoes por Obra:</label>
 <select id="aiObraFilter"><option value="TODAS">TODAS</option></select>
-<div class="btn-row" style="margin-top:20px">
-<button onclick="runAIAnalysis()">Analisar</button>
+</div>
+<div style="display:flex;align-items:end">
+<button onclick="runAnalysis()" id="btnAnalyze" style="width:100%">Analisar</button>
 </div>
 </div>
+
+<div id="aiProgress" class="hidden" style="margin-top:15px">
+<div style="color:#aaa;font-size:14px" id="aiProgressText">Analisando...</div>
+<div class="progress"><div class="progress-fill" id="aiProgressBar" style="width:0%"></div></div>
 </div>
+
 <div id="aiResults" class="hidden" style="margin-top:20px">
+<div class="metrics" id="aiMetrics"></div>
 <h3>Sugestoes de Mapeamento</h3>
 <div id="aiResultsList"></div>
 <div class="btn-row">
@@ -171,298 +193,372 @@ tr:hover{background:#1a1b26}
 <div class="section" id="tab3">
 <h2>Exportar Dados</h2>
 <div class="grid">
-<div class="card">
-<h3>EAP Completa</h3>
-<p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar toda a estrutura EAP em Excel</p>
-<button onclick="exportEAP()">Baixar EAP (Excel)</button>
-</div>
-<div class="card">
-<h3>Mapeamentos Manuais</h3>
-<p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar os mapeamentos realizados manualmente</p>
-<button onclick="exportManual()">Baixar Manuais (Excel)</button>
-</div>
-<div class="card">
-<h3>Mapeamentos IA</h3>
-<p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar os mapeamentos sugeridos pela IA</p>
-<button onclick="exportAIResults()">Baixar IA (Excel)</button>
-</div>
-<div class="card">
-<h3>Todos os Mapeamentos</h3>
-<p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar tudo (manual + IA) em um unico arquivo</p>
-<button onclick="exportAll()">Baixar Tudo (Excel)</button>
-</div>
+<div class="card"><h3>EAP Completa</h3><p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar toda a estrutura EAP</p><button onclick="exportEAP()">Baixar EAP (Excel)</button></div>
+<div class="card"><h3>Mapeamentos Manuais</h3><p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar mapeamentos manuais</p><button onclick="exportManual()">Baixar Manuais (Excel)</button></div>
+<div class="card"><h3>Mapeamentos IA</h3><p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar mapeamentos da IA</p><button onclick="exportAIResults()">Baixar IA (Excel)</button></div>
+<div class="card"><h3>Todos</h3><p style="color:#aaa;font-size:13px;margin-bottom:15px">Baixar tudo em um arquivo</p><button onclick="exportAll()">Baixar Tudo (Excel)</button></div>
 </div>
 </div>
 </div>
 
 <script>
-// ======================== EAP DATA ========================
 const EAP_DATA = [{"Obra": "ADM", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "ADM | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "ADM", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "ADM | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.01", "Descricao": "DESENVOLVIMENTO E GERENCIAMENTO", "Label": "ADM | 10070 DESPESA | 08.01 | DESENVOLVIMENTO E GERENCIAMENTO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.01.01", "Descricao": "DESENVOLVIMENTO", "Label": "ADM | 10070 DESPESA | 08.01.01 | DESENVOLVIMENTO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.01.02", "Descricao": "GERENCIAMENTO", "Label": "ADM | 10070 DESPESA | 08.01.02 | GERENCIAMENTO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02", "Descricao": "DESPESAS ADMINISTRATIVAS", "Label": "ADM | 10070 DESPESA | 08.02 | DESPESAS ADMINISTRATIVAS"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.01", "Descricao": "DESPESAS COM UNIDADES EM ESTOQUE", "Label": "ADM | 10070 DESPESA | 08.02.01 | DESPESAS COM UNIDADES EM ESTOQUE"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.02", "Descricao": "DESPESAS FINANCEIRAS", "Label": "ADM | 10070 DESPESA | 08.02.02 | DESPESAS FINANCEIRAS"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.03", "Descricao": "DESPESAS JURIDICAS", "Label": "ADM | 10070 DESPESA | 08.02.03 | DESPESAS JURIDICAS"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.04", "Descricao": "DESPESAS CONTABEIS", "Label": "ADM | 10070 DESPESA | 08.02.04 | DESPESAS CONTABEIS"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.05", "Descricao": "DESPESAS COM AUDITORIA", "Label": "ADM | 10070 DESPESA | 08.02.05 | DESPESAS COM AUDITORIA"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.06", "Descricao": "SISTEMAS", "Label": "ADM | 10070 DESPESA | 08.02.06 | SISTEMAS"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.07", "Descricao": "SERVICOS DE APOIO ADMINISTRATIVO", "Label": "ADM | 10070 DESPESA | 08.02.07 | SERVICOS DE APOIO ADMINISTRATIVO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.08", "Descricao": "TAXAS E CERTIDOES E ANUIDADES", "Label": "ADM | 10070 DESPESA | 08.02.08 | TAXAS E CERTIDOES E ANUIDADES"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.02.09", "Descricao": "VIAGENS E ESTADIAS ATRELADO A ADMINISTRACAO", "Label": "ADM | 10070 DESPESA | 08.02.09 | VIAGENS E ESTADIAS ATRELADO A ADMINISTRACAO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.03", "Descricao": "OUTRAS DESPESAS ADMINISTRACAO DO EMPREENDIMENTO (SPE)", "Label": "ADM | 10070 DESPESA | 08.03 | OUTRAS DESPESAS ADMINISTRACAO DO EMPREENDIMENTO (SPE)"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.03.01", "Descricao": "SEDE DO EMPREENDIMENTO SPE (CONSTRUCAO)", "Label": "ADM | 10070 DESPESA | 08.03.01 | SEDE DO EMPREENDIMENTO SPE (CONSTRUCAO)"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.03.02", "Descricao": "SEDE DO EMPREENDIMENTO SPE (MANUTENCAO)", "Label": "ADM | 10070 DESPESA | 08.03.02 | SEDE DO EMPREENDIMENTO SPE (MANUTENCAO)"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.04", "Descricao": "GESTAO DE CARTEIRA", "Label": "ADM | 10070 DESPESA | 08.04 | GESTAO DE CARTEIRA"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.04.01", "Descricao": "INTERCAMBIADORA", "Label": "ADM | 10070 DESPESA | 08.04.01 | INTERCAMBIADORA"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.04.01", "Descricao": "REDE INTERCAMBIADORA", "Label": "ADM | 10070 DESPESA | 08.04.01 | REDE INTERCAMBIADORA"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.04.02", "Descricao": "TAXA DE ADMINISTRACAO", "Label": "ADM | 10070 DESPESA | 08.04.02 | TAXA DE ADMINISTRACAO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "08.04.03", "Descricao": "VIAGENS E ESTADIAS ATRELADOS A GESTAO DE CARTEIRA", "Label": "ADM | 10070 DESPESA | 08.04.03 | VIAGENS E ESTADIAS ATRELADOS A GESTAO DE CARTEIRA"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "15", "Descricao": "FOLHA DE PAGAMENTO", "Label": "ADM | 10070 DESPESA | 15 | FOLHA DE PAGAMENTO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "15.01", "Descricao": "ENCARGOS TRABALHISTAS", "Label": "ADM | 10070 DESPESA | 15.01 | ENCARGOS TRABALHISTAS"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "15.01", "Descricao": "FOLHA DE PAGAMENTO", "Label": "ADM | 10070 DESPESA | 15.01 | FOLHA DE PAGAMENTO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "15.01", "Descricao": "FOLHA DE PAGAMENTO - ENCARGOS TRABALHISTAS PATRONAL", "Label": "ADM | 10070 DESPESA | 15.01 | FOLHA DE PAGAMENTO - ENCARGOS TRABALHISTAS PATRONAL"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "15.01", "Descricao": "SALARIOS", "Label": "ADM | 10070 DESPESA | 15.01 | SALARIOS"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "16", "Descricao": "MIGRAÇÃO", "Label": "ADM | 10070 DESPESA | 16 | MIGRAÇÃO"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "16.01", "Descricao": "OUTROS (MIGRACAO)", "Label": "ADM | 10070 DESPESA | 16.01 | OUTROS (MIGRACAO)"}, {"Obra": "ADM", "Produto": "10070 DESPESA", "Item": "8", "Descricao": "DESPESA ADMINISTRATIVA", "Label": "ADM | 10070 DESPESA | 8 | DESPESA ADMINISTRATIVA"}, {"Obra": "ALP", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "ALP | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "ALP", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "ALP | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "05.", "Descricao": "CUSTO DE PROJETOS E CONSULTORIAS", "Label": "ALP | 10060 CUSTO | 05. | CUSTO DE PROJETOS E CONSULTORIAS"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "05.01", "Descricao": "CUSTO DE PROJETOS", "Label": "ALP | 10060 CUSTO | 05.01 | CUSTO DE PROJETOS"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "05.02", "Descricao": "CUSTO DE CONSULTORIAS E LAUDOS", "Label": "ALP | 10060 CUSTO | 05.02 | CUSTO DE CONSULTORIAS E LAUDOS"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "05.03", "Descricao": "COPIAS HELIOGRAFICAS", "Label": "ALP | 10060 CUSTO | 05.03 | COPIAS HELIOGRAFICAS"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "06.", "Descricao": "CUSTO DE LEGALIZACAO E APROVACOES", "Label": "ALP | 10060 CUSTO | 06. | CUSTO DE LEGALIZACAO E APROVACOES"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "06.01", "Descricao": "DESPESAS CARTORIOS (APROVACAO)", "Label": "ALP | 10060 CUSTO | 06.01 | DESPESAS CARTORIOS (APROVACAO)"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "06.02", "Descricao": "CONSULTORIAS JURIDICAS", "Label": "ALP | 10060 CUSTO | 06.02 | CONSULTORIAS JURIDICAS"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "06.03", "Descricao": "CUSTO DE LEGALIZACAO E APROVACOES", "Label": "ALP | 10060 CUSTO | 06.03 | CUSTO DE LEGALIZACAO E APROVACOES"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "07.01", "Descricao": "OUTROS (MIGRACAO)", "Label": "ALP | 10060 CUSTO | 07.01 | OUTROS (MIGRACAO)"}, {"Obra": "ALP", "Produto": "10060 CUSTO", "Item": "7", "Descricao": "MIGRAÇÃO", "Label": "ALP | 10060 CUSTO | 7 | MIGRAÇÃO"}, {"Obra": "APT", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "APT | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "APT", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "APT | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "APT", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.02", "Descricao": "APORTES HOLDING", "Label": "APT | 10080 MOVIMENTACAO FINANCEIRA | 13.02 | APORTES HOLDING"}, {"Obra": "APT", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.02.01", "Descricao": "APORTE HOLDING", "Label": "APT | 10080 MOVIMENTACAO FINANCEIRA | 13.02.01 | APORTE HOLDING"}, {"Obra": "APT", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.02.01", "Descricao": "APORTES HOLDING", "Label": "APT | 10080 MOVIMENTACAO FINANCEIRA | 13.02.01 | APORTES HOLDING"}, {"Obra": "CAQ", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "CAQ | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "CAQ", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "CAQ | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.", "Descricao": "CUSTO DO TERRENO", "Label": "CAQ | 10060 CUSTO | 07. | CUSTO DO TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.01", "Descricao": "AQUISICAO DE TERRENO", "Label": "CAQ | 10060 CUSTO | 07.01 | AQUISICAO DE TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.02", "Descricao": "ACERTO PERMUTA REMANESCENTE", "Label": "CAQ | 10060 CUSTO | 07.02 | ACERTO PERMUTA REMANESCENTE"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.03", "Descricao": "ALUGUEL DE IMOVEIS PARA PERMUTANTES", "Label": "CAQ | 10060 CUSTO | 07.03 | ALUGUEL DE IMOVEIS PARA PERMUTANTES"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.04", "Descricao": "FIANCA BANCARIA / SEGURO PERFORMANCE BOND / GARANTIA TERRENO", "Label": "CAQ | 10060 CUSTO | 07.04 | FIANCA BANCARIA / SEGURO PERFORMANCE BOND / GARANTIA TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.05", "Descricao": "ITBI / ISTI / REGISTRO", "Label": "CAQ | 10060 CUSTO | 07.05 | ITBI / ISTI / REGISTRO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.06", "Descricao": "IPTU / ITU / AGUA E ENERGIA DO TERRENO", "Label": "CAQ | 10060 CUSTO | 07.06 | IPTU / ITU / AGUA E ENERGIA DO TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.07", "Descricao": "INTERMEDIACAO DE NEGOCIO", "Label": "CAQ | 10060 CUSTO | 07.07 | INTERMEDIACAO DE NEGOCIO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.08", "Descricao": "LEGALIZACAO DE TERRENO", "Label": "CAQ | 10060 CUSTO | 07.08 | LEGALIZACAO DE TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.09", "Descricao": "LEVANTAMENTO PLANIALTIMETRICO / SONDAGEM", "Label": "CAQ | 10060 CUSTO | 07.09 | LEVANTAMENTO PLANIALTIMETRICO / SONDAGEM"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.10", "Descricao": "ESCRITURA / OUTRAS CERTIDOES", "Label": "CAQ | 10060 CUSTO | 07.10 | ESCRITURA / OUTRAS CERTIDOES"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.11", "Descricao": "CONSTRUCAO DE EDIFICACOES", "Label": "CAQ | 10060 CUSTO | 07.11 | CONSTRUCAO DE EDIFICACOES"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.12", "Descricao": "DEMOLICAO DE EDIFICACOES EXISTENTES / LIMPEZA", "Label": "CAQ | 10060 CUSTO | 07.12 | DEMOLICAO DE EDIFICACOES EXISTENTES / LIMPEZA"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.13", "Descricao": "CANCELAMENTO DE LIGACOES DE AGUA E ESGOTO", "Label": "CAQ | 10060 CUSTO | 07.13 | CANCELAMENTO DE LIGACOES DE AGUA E ESGOTO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.14", "Descricao": "CORTE E REMOCAO DE ARVORES", "Label": "CAQ | 10060 CUSTO | 07.14 | CORTE E REMOCAO DE ARVORES"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.15", "Descricao": "REMEMBRAMENTO DE TERRENO", "Label": "CAQ | 10060 CUSTO | 07.15 | REMEMBRAMENTO DE TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.16", "Descricao": "COMISSAO SOBRE TERRENO", "Label": "CAQ | 10060 CUSTO | 07.16 | COMISSAO SOBRE TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.17", "Descricao": "CONDOMINIO SOBRE TERRENO", "Label": "CAQ | 10060 CUSTO | 07.17 | CONDOMINIO SOBRE TERRENO"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.18", "Descricao": "OUTORGA ONEROSA / TRANSFERENCIA DE INDICE", "Label": "CAQ | 10060 CUSTO | 07.18 | OUTORGA ONEROSA / TRANSFERENCIA DE INDICE"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.19", "Descricao": "ASSESSORIA NA CAPTACAO DE TERRENOS", "Label": "CAQ | 10060 CUSTO | 07.19 | ASSESSORIA NA CAPTACAO DE TERRENOS"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.20", "Descricao": "ANALISE JURIDICA DO TERRENO POR IMOVEL", "Label": "CAQ | 10060 CUSTO | 07.20 | ANALISE JURIDICA DO TERRENO POR IMOVEL"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.21", "Descricao": "COMPRA DE IMOVEIS", "Label": "CAQ | 10060 CUSTO | 07.21 | COMPRA DE IMOVEIS"}, {"Obra": "CAQ", "Produto": "10060 CUSTO", "Item": "07.22", "Descricao": "OUTROS CUSTOS DE TERRENO", "Label": "CAQ | 10060 CUSTO | 07.22 | OUTROS CUSTOS DE TERRENO"}, {"Obra": "CDR", "Produto": "10000 DEDUTORES DE RECEITA", "Item": "0", "Descricao": "DEDUTORES DE RECEITA", "Label": "CDR | 10000 DEDUTORES DE RECEITA | 0 | DEDUTORES DE RECEITA"}, {"Obra": "CDR", "Produto": "10000 DEDUTORES DE RECEITA", "Item": "00.01", "Descricao": "DISTRATO DE VENDA", "Label": "CDR | 10000 DEDUTORES DE RECEITA | 00.01 | DISTRATO DE VENDA"}, {"Obra": "CDR", "Produto": "10000 DEDUTORES DE RECEITA", "Item": "00.02", "Descricao": "IMPOSTOS SOBRE RECEITA", "Label": "CDR | 10000 DEDUTORES DE RECEITA | 00.02 | IMPOSTOS SOBRE RECEITA"}, {"Obra": "CDR", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "CDR | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "CDR", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "CDR | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "COM", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "COM | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "COM", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "COM | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "09.01", "Descricao": "COORDENACAO COMERCIAL", "Label": "COM | 10070 DESPESA | 09.01 | COORDENACAO COMERCIAL"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "09.02", "Descricao": "COMISSOES", "Label": "COM | 10070 DESPESA | 09.02 | COMISSOES"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "09.03", "Descricao": "PREMIACAO DE CORRETORES (VENDAS)", "Label": "COM | 10070 DESPESA | 09.03 | PREMIACAO DE CORRETORES (VENDAS)"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "09.04", "Descricao": "TAXA DE ASSOCIACAO PARCERIAS (VENDAS)", "Label": "COM | 10070 DESPESA | 09.04 | TAXA DE ASSOCIACAO PARCERIAS (VENDAS)"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "09.05", "Descricao": "VIAGENS E ESTADIAS ATRELADAS A COMERCIALIZACAO", "Label": "COM | 10070 DESPESA | 09.05 | VIAGENS E ESTADIAS ATRELADAS A COMERCIALIZACAO"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "16", "Descricao": "FOLHA DE PAGAMENTO COMERCIAL", "Label": "COM | 10070 DESPESA | 16 | FOLHA DE PAGAMENTO COMERCIAL"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "16.01", "Descricao": "ENCARGOS TRABALHISTAS", "Label": "COM | 10070 DESPESA | 16.01 | ENCARGOS TRABALHISTAS"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "16.01", "Descricao": "FOLHA DE PAGAMENTO - ENCARGOS TRABALHISTAS PATRONAL", "Label": "COM | 10070 DESPESA | 16.01 | FOLHA DE PAGAMENTO - ENCARGOS TRABALHISTAS PATRONAL"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "16.01", "Descricao": "FOLHA DE PAGAMENTO COMERCIAL", "Label": "COM | 10070 DESPESA | 16.01 | FOLHA DE PAGAMENTO COMERCIAL"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "16.01", "Descricao": "SALARIOS", "Label": "COM | 10070 DESPESA | 16.01 | SALARIOS"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "17", "Descricao": "MIGRAÇÃO", "Label": "COM | 10070 DESPESA | 17 | MIGRAÇÃO"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "17.01", "Descricao": "OUTROS (MIGRACAO)", "Label": "COM | 10070 DESPESA | 17.01 | OUTROS (MIGRACAO)"}, {"Obra": "COM", "Produto": "10070 DESPESA", "Item": "9", "Descricao": "DESPESA COMERCIAL", "Label": "COM | 10070 DESPESA | 9 | DESPESA COMERCIAL"}, {"Obra": "DIS", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "DIS | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "DIS", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "DIS | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13", "Descricao": "DISTRIBUICAO", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13 | DISTRIBUICAO"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.01", "Descricao": "DISTRIBUICAO TERRENEIRO", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13.01 | DISTRIBUICAO TERRENEIRO"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.02", "Descricao": "DISTRIBUICAO DESENVOLVEDOR", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13.02 | DISTRIBUICAO DESENVOLVEDOR"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.03", "Descricao": "DISTRIBUICAO FUNDO", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13.03 | DISTRIBUICAO FUNDO"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.04", "Descricao": "ADIANTAMENTO DE DIVIDENDOS TERRENEIROS", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13.04 | ADIANTAMENTO DE DIVIDENDOS TERRENEIROS"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.05", "Descricao": "ADIANTAMENTO DE DIVIDENDOS DESENVOLVIMENTO", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13.05 | ADIANTAMENTO DE DIVIDENDOS DESENVOLVIMENTO"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.06", "Descricao": "ADIANTAMENTO DE DIVIDENDOS FUNDO (FII)", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13.06 | ADIANTAMENTO DE DIVIDENDOS FUNDO (FII)"}, {"Obra": "DIS", "Produto": "10080 MOVIMENTACAO FINANCEIRA", "Item": "13.07", "Descricao": "REDUCAO DE CAPITAL / AFAC", "Label": "DIS | 10080 MOVIMENTACAO FINANCEIRA | 13.07 | REDUCAO DE CAPITAL / AFAC"}, {"Obra": "DPO", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "DPO | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "DPO", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "DPO | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "DPO", "Produto": "10070 DESPESA", "Item": "14.", "Descricao": "DESPESAS DE GARANTIA / POS OBRA", "Label": "DPO | 10070 DESPESA | 14. | DESPESAS DE GARANTIA / POS OBRA"}, {"Obra": "DPO", "Produto": "10070 DESPESA", "Item": "14..03", "Descricao": "DESPESAS MANUTENCAO POS OBRA", "Label": "DPO | 10070 DESPESA | 14..03 | DESPESAS MANUTENCAO POS OBRA"}, {"Obra": "DPO", "Produto": "10070 DESPESA", "Item": "14..03", "Descricao": "DESPESAS MANUTENÇÃO POS OBRA", "Label": "DPO | 10070 DESPESA | 14..03 | DESPESAS MANUTENÇÃO POS OBRA"}, {"Obra": "DPO", "Produto": "10070 DESPESA", "Item": "14.01", "Descricao": "DESPESAS PRE OPERACIONAIS", "Label": "DPO | 10070 DESPESA | 14.01 | DESPESAS PRE OPERACIONAIS"}, {"Obra": "DPO", "Produto": "10070 DESPESA", "Item": "14.02", "Descricao": "GARANTIA TECNICA POS OBRA", "Label": "DPO | 10070 DESPESA | 14.02 | GARANTIA TECNICA POS OBRA"}, {"Obra": "DPV", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "DPV | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "DPV", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "DPV | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "DPV", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "11.", "Descricao": "POS VENDA", "Label": "DPV | 10050 DEVOLUCAO/ESTORNO | 11. | POS VENDA"}, {"Obra": "DPV", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "11.01", "Descricao": "DESPESAS DE POS VENDA COM O CLIENTE", "Label": "DPV | 10050 DEVOLUCAO/ESTORNO | 11.01 | DESPESAS DE POS VENDA COM O CLIENTE"}, {"Obra": "DPV", "Produto": "10070 DESPESA", "Item": "11.", "Descricao": "POS VENDA", "Label": "DPV | 10070 DESPESA | 11. | POS VENDA"}, {"Obra": "DPV", "Produto": "10070 DESPESA", "Item": "11.01", "Descricao": "DESPESAS DE POS VENDA COM O CLIENTE", "Label": "DPV | 10070 DESPESA | 11.01 | DESPESAS DE POS VENDA COM O CLIENTE"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.", "Descricao": "EMPRESTIMO", "Label": "EMP | 10040 EMPRESTIMO | 12. | EMPRESTIMO"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.01", "Descricao": "CAPITAL DE GIRO", "Label": "EMP | 10040 EMPRESTIMO | 12.01 | CAPITAL DE GIRO"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.02", "Descricao": "FINANCIAMENTO A PRODUCAO", "Label": "EMP | 10040 EMPRESTIMO | 12.02 | FINANCIAMENTO A PRODUCAO"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.02", "Descricao": "FINANCIAMENTO APOIO A PRODUCAO - AMORTIZACOES DE EMPRESTIMOS", "Label": "EMP | 10040 EMPRESTIMO | 12.02 | FINANCIAMENTO APOIO A PRODUCAO - AMORTIZACOES DE EMPRESTIMOS"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.02", "Descricao": "FINANCIAMENTO APOIO A PRODUCAO - MULTAS E JUROS ATRASO", "Label": "EMP | 10040 EMPRESTIMO | 12.02 | FINANCIAMENTO APOIO A PRODUCAO - MULTAS E JUROS ATRASO"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.02", "Descricao": "FINANCIAMENTO APOIO A PRODUCAO - OUTRAS DESPESAS", "Label": "EMP | 10040 EMPRESTIMO | 12.02 | FINANCIAMENTO APOIO A PRODUCAO - OUTRAS DESPESAS"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.02", "Descricao": "FINANCIAMENTO APOIO A PRODUCAO - PAGAMENTO DE JUROS (CUSTO)", "Label": "EMP | 10040 EMPRESTIMO | 12.02 | FINANCIAMENTO APOIO A PRODUCAO - PAGAMENTO DE JUROS (CUSTO)"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.03", "Descricao": "SECURITIZACAO DA CARTEIRA (CRI)", "Label": "EMP | 10040 EMPRESTIMO | 12.03 | SECURITIZACAO DA CARTEIRA (CRI)"}, {"Obra": "EMP", "Produto": "10040 EMPRESTIMO", "Item": "12.04", "Descricao": "EMPRESTIMO A SOCIOS / TERCEIROS", "Label": "EMP | 10040 EMPRESTIMO | 12.04 | EMPRESTIMO A SOCIOS / TERCEIROS"}, {"Obra": "EMP", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "EMP | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "MKT", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "MKT | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "MKT", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "MKT | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10", "Descricao": "DESPESAS COM PUBLICIDADE E MARKETING", "Label": "MKT | 10070 DESPESA | 10 | DESPESAS COM PUBLICIDADE E MARKETING"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.01", "Descricao": "CONSULTORIAS E ASSESSORIAS", "Label": "MKT | 10070 DESPESA | 10.01 | CONSULTORIAS E ASSESSORIAS"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.02", "Descricao": "AGENCIA", "Label": "MKT | 10070 DESPESA | 10.02 | AGENCIA"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "ACOES COMERCIAIS (PROMOVIDAS/SOLICITADAS POR CORRETORES)", "Label": "MKT | 10070 DESPESA | 10.03 | ACOES COMERCIAIS (PROMOVIDAS/SOLICITADAS POR CORRETORES)"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "ACOES DE MARKETING PROMOCIONAL", "Label": "MKT | 10070 DESPESA | 10.03 | ACOES DE MARKETING PROMOCIONAL"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "CAMPANHA DE PREMIACAO PARA CORRETORES", "Label": "MKT | 10070 DESPESA | 10.03 | CAMPANHA DE PREMIACAO PARA CORRETORES"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "ENDOMARKETING", "Label": "MKT | 10070 DESPESA | 10.03 | ENDOMARKETING"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "EVENTO DE LANCAMENTO", "Label": "MKT | 10070 DESPESA | 10.03 | EVENTO DE LANCAMENTO"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "EVENTOS", "Label": "MKT | 10070 DESPESA | 10.03 | EVENTOS"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "MEETING", "Label": "MKT | 10070 DESPESA | 10.03 | MEETING"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.03", "Descricao": "PRODUCOES ON/OFF", "Label": "MKT | 10070 DESPESA | 10.03 | PRODUCOES ON/OFF"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.04", "Descricao": "PATROCINIO", "Label": "MKT | 10070 DESPESA | 10.04 | PATROCINIO"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.05", "Descricao": "IMPRESSOS E MATERIAIS PUBLICITARIOS (VENDAS)", "Label": "MKT | 10070 DESPESA | 10.05 | IMPRESSOS E MATERIAIS PUBLICITARIOS (VENDAS)"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.06", "Descricao": "MIDIA (RADIO, OUTDOOR)", "Label": "MKT | 10070 DESPESA | 10.06 | MIDIA (RADIO, OUTDOOR)"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.07", "Descricao": "DIGITAL (SITE, GOOGLE, APP, MIDIAS SOCIAIS)", "Label": "MKT | 10070 DESPESA | 10.07 | DIGITAL (SITE, GOOGLE, APP, MIDIAS SOCIAIS)"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.08", "Descricao": "BRINDES", "Label": "MKT | 10070 DESPESA | 10.08 | BRINDES"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.09", "Descricao": "MAQUETE FISICA", "Label": "MKT | 10070 DESPESA | 10.09 | MAQUETE FISICA"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.10", "Descricao": "MAQUETES ELETRONICAS E IMAGENS", "Label": "MKT | 10070 DESPESA | 10.10 | MAQUETES ELETRONICAS E IMAGENS"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.11", "Descricao": "VIAGENS E ESTADIAS ATRELADO A MARKETING", "Label": "MKT | 10070 DESPESA | 10.11 | VIAGENS E ESTADIAS ATRELADO A MARKETING"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "10.12", "Descricao": "CAPTACAO DE CLIENTES / LEADS", "Label": "MKT | 10070 DESPESA | 10.12 | CAPTACAO DE CLIENTES / LEADS"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "17", "Descricao": "FOLHA DE PAGAMENTO MARKETING", "Label": "MKT | 10070 DESPESA | 17 | FOLHA DE PAGAMENTO MARKETING"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "17.01", "Descricao": "ENCARGOS TRABALHISTAS", "Label": "MKT | 10070 DESPESA | 17.01 | ENCARGOS TRABALHISTAS"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "17.01", "Descricao": "FOLHA DE PAGAMENTO - ENCARGOS TRABALHISTAS PATRONAL", "Label": "MKT | 10070 DESPESA | 17.01 | FOLHA DE PAGAMENTO - ENCARGOS TRABALHISTAS PATRONAL"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "17.01", "Descricao": "FOLHA DE PAGAMENTO MARKETING", "Label": "MKT | 10070 DESPESA | 17.01 | FOLHA DE PAGAMENTO MARKETING"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "17.01", "Descricao": "SALARIOS", "Label": "MKT | 10070 DESPESA | 17.01 | SALARIOS"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "18", "Descricao": "MIGRAÇÃO", "Label": "MKT | 10070 DESPESA | 18 | MIGRAÇÃO"}, {"Obra": "MKT", "Produto": "10070 DESPESA", "Item": "18.01", "Descricao": "OUTROS (MIGRACAO)", "Label": "MKT | 10070 DESPESA | 18.01 | OUTROS (MIGRACAO)"}, {"Obra": "OBR", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "OBR | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "OBR", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "OBR | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.", "Descricao": "CUSTO OBRA", "Label": "OBR | 10060 CUSTO | 01. | CUSTO OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.01", "Descricao": "EQUIPE TECNICA ( GESTAO DE OBRA)", "Label": "OBR | 10060 CUSTO | 01.01 | EQUIPE TECNICA ( GESTAO DE OBRA)"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.01.01", "Descricao": "EQUIPE TECNICA", "Label": "OBR | 10060 CUSTO | 01.01.01 | EQUIPE TECNICA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.01.02", "Descricao": "VIAGENS", "Label": "OBR | 10060 CUSTO | 01.01.02 | VIAGENS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.01.02", "Descricao": "VIAGENS E ESTADIAS ATRELADO A OBRA", "Label": "OBR | 10060 CUSTO | 01.01.02 | VIAGENS E ESTADIAS ATRELADO A OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02", "Descricao": "CUSTAS OPERACIONAIS E OUTROS CUSTOS INDIRETOS", "Label": "OBR | 10060 CUSTO | 01.02 | CUSTAS OPERACIONAIS E OUTROS CUSTOS INDIRETOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.01", "Descricao": "MAO DE OBRA INDIRETA - OBRA", "Label": "OBR | 10060 CUSTO | 01.02.01 | MAO DE OBRA INDIRETA - OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.02", "Descricao": "MATERIAL DE CONSUMO CANTEIRO", "Label": "OBR | 10060 CUSTO | 01.02.02 | MATERIAL DE CONSUMO CANTEIRO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.03", "Descricao": "CONSUMOS (AGUA, ENERGIA E INTERNET / TELEFONE)", "Label": "OBR | 10060 CUSTO | 01.02.03 | CONSUMOS (AGUA, ENERGIA E INTERNET / TELEFONE)"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.04", "Descricao": "MANUTENCAO DE MAQUINAS EQUIPAMENTOS", "Label": "OBR | 10060 CUSTO | 01.02.04 | MANUTENCAO DE MAQUINAS EQUIPAMENTOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.05", "Descricao": "AQUISICAO E LOCACAO DE MAQUINAS E EQUIPAMENTOS", "Label": "OBR | 10060 CUSTO | 01.02.05 | AQUISICAO E LOCACAO DE MAQUINAS E EQUIPAMENTOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.06", "Descricao": "SEGURO DE OBRA", "Label": "OBR | 10060 CUSTO | 01.02.06 | SEGURO DE OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.07", "Descricao": "LIGACAO PROVISORIA DE AGUA E ENERGIA", "Label": "OBR | 10060 CUSTO | 01.02.07 | LIGACAO PROVISORIA DE AGUA E ENERGIA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.08", "Descricao": "CANTEIRO DE OBRA / BARRACAO DE OBRA", "Label": "OBR | 10060 CUSTO | 01.02.08 | CANTEIRO DE OBRA / BARRACAO DE OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.02.09", "Descricao": "FERRAMENTAS GERAIS, EPI`S E EPC`S", "Label": "OBR | 10060 CUSTO | 01.02.09 | FERRAMENTAS GERAIS, EPI`S E EPC`S"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.03", "Descricao": "INSTALACAO DO CANTEIRO / SERVICOS PRELIMINARES", "Label": "OBR | 10060 CUSTO | 01.03 | INSTALACAO DO CANTEIRO / SERVICOS PRELIMINARES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.03.01", "Descricao": "DISTRIBUICAO PROVISORA DE AGUA/ESGOTO/ENERGIA", "Label": "OBR | 10060 CUSTO | 01.03.01 | DISTRIBUICAO PROVISORA DE AGUA/ESGOTO/ENERGIA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.03.02", "Descricao": "SERVICOS AUXILIARES", "Label": "OBR | 10060 CUSTO | 01.03.02 | SERVICOS AUXILIARES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.03.03", "Descricao": "PLACAS", "Label": "OBR | 10060 CUSTO | 01.03.03 | PLACAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.04", "Descricao": "INFRA-ESTRUTURA", "Label": "OBR | 10060 CUSTO | 01.04 | INFRA-ESTRUTURA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.04.01", "Descricao": "IMPLANTACAO DA OBRA", "Label": "OBR | 10060 CUSTO | 01.04.01 | IMPLANTACAO DA OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.04.02", "Descricao": "MOVIMENTACAO DE TERRA", "Label": "OBR | 10060 CUSTO | 01.04.02 | MOVIMENTACAO DE TERRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.04.03", "Descricao": "FUNDACAO", "Label": "OBR | 10060 CUSTO | 01.04.03 | FUNDACAO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.04.04", "Descricao": "CONTENCAO", "Label": "OBR | 10060 CUSTO | 01.04.04 | CONTENCAO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.05", "Descricao": "SUPRAESTRUTURA", "Label": "OBR | 10060 CUSTO | 01.05 | SUPRAESTRUTURA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.05.01", "Descricao": "ESTRUTURA", "Label": "OBR | 10060 CUSTO | 01.05.01 | ESTRUTURA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.06", "Descricao": "PAREDES / VEDACOES", "Label": "OBR | 10060 CUSTO | 01.06 | PAREDES / VEDACOES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.06.01", "Descricao": "PAREDES / VEDACOES", "Label": "OBR | 10060 CUSTO | 01.06.01 | PAREDES / VEDACOES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.07", "Descricao": "ESQUADRIAS EM GERAL", "Label": "OBR | 10060 CUSTO | 01.07 | ESQUADRIAS EM GERAL"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.07.01", "Descricao": "ESQUADRIAS EM ALUMINIO", "Label": "OBR | 10060 CUSTO | 01.07.01 | ESQUADRIAS EM ALUMINIO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.07.02", "Descricao": "ESQUADRIAS EM MADEIRA", "Label": "OBR | 10060 CUSTO | 01.07.02 | ESQUADRIAS EM MADEIRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.07.03", "Descricao": "ESQUADRIAS EM FERRO", "Label": "OBR | 10060 CUSTO | 01.07.03 | ESQUADRIAS EM FERRO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.07.04", "Descricao": "ESQUADRIAS EM PVC", "Label": "OBR | 10060 CUSTO | 01.07.04 | ESQUADRIAS EM PVC"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.07.05", "Descricao": "FACHADA MODULAR / UNITIZADA", "Label": "OBR | 10060 CUSTO | 01.07.05 | FACHADA MODULAR / UNITIZADA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.07.06", "Descricao": "PORTA CORTA-FOGO", "Label": "OBR | 10060 CUSTO | 01.07.06 | PORTA CORTA-FOGO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.08", "Descricao": "INSTALACOES ELETRICAS / TELEFONICAS / ANTENAS / SPDA / DADOS", "Label": "OBR | 10060 CUSTO | 01.08 | INSTALACOES ELETRICAS / TELEFONICAS / ANTENAS / SPDA / DADOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.08.01", "Descricao": "INSTALACAO ELETRICA", "Label": "OBR | 10060 CUSTO | 01.08.01 | INSTALACAO ELETRICA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.08.02", "Descricao": "INSTALACAO TELEFONICA", "Label": "OBR | 10060 CUSTO | 01.08.02 | INSTALACAO TELEFONICA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.08.03", "Descricao": "INSTALACAO DE DADOS ESTRUTURADOS", "Label": "OBR | 10060 CUSTO | 01.08.03 | INSTALACAO DE DADOS ESTRUTURADOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.08.04", "Descricao": "ANTENA", "Label": "OBR | 10060 CUSTO | 01.08.04 | ANTENA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.08.05", "Descricao": "INSTALACAO SPDA", "Label": "OBR | 10060 CUSTO | 01.08.05 | INSTALACAO SPDA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.08.06", "Descricao": "LUMINARIAS", "Label": "OBR | 10060 CUSTO | 01.08.06 | LUMINARIAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.09", "Descricao": "INSTALACOES HIDRAULICA / SANITARIA / GAS / INCENDIO", "Label": "OBR | 10060 CUSTO | 01.09 | INSTALACOES HIDRAULICA / SANITARIA / GAS / INCENDIO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.09.01", "Descricao": "INSTALACAO HIDRAULICA", "Label": "OBR | 10060 CUSTO | 01.09.01 | INSTALACAO HIDRAULICA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.09.02", "Descricao": "INSTALACAO SANITARIA / PLUVIAL / DRENO", "Label": "OBR | 10060 CUSTO | 01.09.02 | INSTALACAO SANITARIA / PLUVIAL / DRENO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.09.03", "Descricao": "INSTALACAO GAS", "Label": "OBR | 10060 CUSTO | 01.09.03 | INSTALACAO GAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.09.04", "Descricao": "INSTALACAO INCENDIO", "Label": "OBR | 10060 CUSTO | 01.09.04 | INSTALACAO INCENDIO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.10", "Descricao": "INSTALACOES MECANICAS", "Label": "OBR | 10060 CUSTO | 01.10 | INSTALACOES MECANICAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.10.01", "Descricao": "EXAUSTAO MECANICA", "Label": "OBR | 10060 CUSTO | 01.10.01 | EXAUSTAO MECANICA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.10.02", "Descricao": "PRESSURIZACAO MECANICA", "Label": "OBR | 10060 CUSTO | 01.10.02 | PRESSURIZACAO MECANICA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.10.03", "Descricao": "REDE FRIGORIGENA", "Label": "OBR | 10060 CUSTO | 01.10.03 | REDE FRIGORIGENA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.10.04", "Descricao": "EQUIPAMENTOS DE AR CONDICIONADO", "Label": "OBR | 10060 CUSTO | 01.10.04 | EQUIPAMENTOS DE AR CONDICIONADO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.10.05", "Descricao": "ELEVADOR", "Label": "OBR | 10060 CUSTO | 01.10.05 | ELEVADOR"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.11", "Descricao": "LOUCAS / METAIS / BANCADAS / ACESSORIOS", "Label": "OBR | 10060 CUSTO | 01.11 | LOUCAS / METAIS / BANCADAS / ACESSORIOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.11.01", "Descricao": "LOUCAS", "Label": "OBR | 10060 CUSTO | 01.11.01 | LOUCAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.11.02", "Descricao": "METAIS", "Label": "OBR | 10060 CUSTO | 01.11.02 | METAIS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.11.03", "Descricao": "BANCADAS", "Label": "OBR | 10060 CUSTO | 01.11.03 | BANCADAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.11.04", "Descricao": "ACESSORIOS", "Label": "OBR | 10060 CUSTO | 01.11.04 | ACESSORIOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.12", "Descricao": "IMPERMEABILIZACOES / TRATAMENTO TERMICO / ACUSTICO", "Label": "OBR | 10060 CUSTO | 01.12 | IMPERMEABILIZACOES / TRATAMENTO TERMICO / ACUSTICO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.12.01", "Descricao": "IMPERMEABILIZACAO", "Label": "OBR | 10060 CUSTO | 01.12.01 | IMPERMEABILIZACAO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.12.02", "Descricao": "TRATAMENTO DE JUNTA DE DILATACAO", "Label": "OBR | 10060 CUSTO | 01.12.02 | TRATAMENTO DE JUNTA DE DILATACAO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.12.03", "Descricao": "TRATAMENTO / ISOLAMENTO ACUSTICO", "Label": "OBR | 10060 CUSTO | 01.12.03 | TRATAMENTO / ISOLAMENTO ACUSTICO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.12.04", "Descricao": "TRATAMENTO / ISOLAMENTO TERMICO", "Label": "OBR | 10060 CUSTO | 01.12.04 | TRATAMENTO / ISOLAMENTO TERMICO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.13", "Descricao": "REVESTIMENTOS DE PAREDES INTERNAS E ARREMATES", "Label": "OBR | 10060 CUSTO | 01.13 | REVESTIMENTOS DE PAREDES INTERNAS E ARREMATES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.13.01", "Descricao": "REVESTIMENTOS DE PAREDES INTERNAS E ARREMATES", "Label": "OBR | 10060 CUSTO | 01.13.01 | REVESTIMENTOS DE PAREDES INTERNAS E ARREMATES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.13.01", "Descricao": "REVESTIMENTOS DE PAREDES INTERNAS E ARREMATES - MO", "Label": "OBR | 10060 CUSTO | 01.13.01 | REVESTIMENTOS DE PAREDES INTERNAS E ARREMATES - MO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.14", "Descricao": "REVESTIMENTOS DE PAREDES EXTERNAS E ARREMATES", "Label": "OBR | 10060 CUSTO | 01.14 | REVESTIMENTOS DE PAREDES EXTERNAS E ARREMATES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.14.01", "Descricao": "REVESTIMENTOS DE PAREDES EXTERNAS E ARREMATES", "Label": "OBR | 10060 CUSTO | 01.14.01 | REVESTIMENTOS DE PAREDES EXTERNAS E ARREMATES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.15", "Descricao": "REVESTIMENTOS DE TETOS / FORROS", "Label": "OBR | 10060 CUSTO | 01.15 | REVESTIMENTOS DE TETOS / FORROS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.15.01", "Descricao": "REVESTIMENTO DE TETO", "Label": "OBR | 10060 CUSTO | 01.15.01 | REVESTIMENTO DE TETO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.15.02", "Descricao": "FORRO DE TETO", "Label": "OBR | 10060 CUSTO | 01.15.02 | FORRO DE TETO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.15.03", "Descricao": "FIRE STOP SHAFT / COMPARTIMENTACAO", "Label": "OBR | 10060 CUSTO | 01.15.03 | FIRE STOP SHAFT / COMPARTIMENTACAO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.16", "Descricao": "COBERTURAS", "Label": "OBR | 10060 CUSTO | 01.16 | COBERTURAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.16.01", "Descricao": "RUFOS / CALHAS", "Label": "OBR | 10060 CUSTO | 01.16.01 | RUFOS / CALHAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.16.02", "Descricao": "ESTRUTURA PARA COBERTURA / TELHAMENTO", "Label": "OBR | 10060 CUSTO | 01.16.02 | ESTRUTURA PARA COBERTURA / TELHAMENTO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17", "Descricao": "PAVIMENTACAO", "Label": "OBR | 10060 CUSTO | 01.17 | PAVIMENTACAO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.01", "Descricao": "REGULARIZACAO DE SUPERFICIE", "Label": "OBR | 10060 CUSTO | 01.17.01 | REGULARIZACAO DE SUPERFICIE"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.02", "Descricao": "SOLEIRAS E FILETES", "Label": "OBR | 10060 CUSTO | 01.17.02 | SOLEIRAS E FILETES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.03", "Descricao": "PAVIMENTACAO CERAMICA", "Label": "OBR | 10060 CUSTO | 01.17.03 | PAVIMENTACAO CERAMICA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.04", "Descricao": "PEDRA NATURAL", "Label": "OBR | 10060 CUSTO | 01.17.04 | PEDRA NATURAL"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.05", "Descricao": "PAVIMENTACAO CIMENTICIA", "Label": "OBR | 10060 CUSTO | 01.17.05 | PAVIMENTACAO CIMENTICIA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.06", "Descricao": "PAVIMENTACAO MADEIRA", "Label": "OBR | 10060 CUSTO | 01.17.06 | PAVIMENTACAO MADEIRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.07", "Descricao": "PAVIMENTACAO VINILICA / EMBORRACHADA", "Label": "OBR | 10060 CUSTO | 01.17.07 | PAVIMENTACAO VINILICA / EMBORRACHADA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.17.07", "Descricao": "PAVIMENTACAO VINILICA / EMBORRACHADA /ESPECIAIS", "Label": "OBR | 10060 CUSTO | 01.17.07 | PAVIMENTACAO VINILICA / EMBORRACHADA /ESPECIAIS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.18", "Descricao": "VIDROS", "Label": "OBR | 10060 CUSTO | 01.18 | VIDROS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.18.01", "Descricao": "VIDRO DE SEGURANCA", "Label": "OBR | 10060 CUSTO | 01.18.01 | VIDRO DE SEGURANCA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.18.02", "Descricao": "VIDRO TEMPERADO", "Label": "OBR | 10060 CUSTO | 01.18.02 | VIDRO TEMPERADO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.18.03", "Descricao": "VIDRO LAMINADO", "Label": "OBR | 10060 CUSTO | 01.18.03 | VIDRO LAMINADO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.18.04", "Descricao": "VIDRO COMUM", "Label": "OBR | 10060 CUSTO | 01.18.04 | VIDRO COMUM"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.18.05", "Descricao": "VIDRO ARAMADO", "Label": "OBR | 10060 CUSTO | 01.18.05 | VIDRO ARAMADO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19", "Descricao": "PINTURAS", "Label": "OBR | 10060 CUSTO | 01.19 | PINTURAS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19.01", "Descricao": "PINTURA INTERNA", "Label": "OBR | 10060 CUSTO | 01.19.01 | PINTURA INTERNA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19.02", "Descricao": "PINTURA EXTERNA", "Label": "OBR | 10060 CUSTO | 01.19.02 | PINTURA EXTERNA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19.03", "Descricao": "PINTURA SOBRE ACO / TUBOS", "Label": "OBR | 10060 CUSTO | 01.19.03 | PINTURA SOBRE ACO / TUBOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19.03", "Descricao": "PINTURA SOBRE ACO/TUBOS", "Label": "OBR | 10060 CUSTO | 01.19.03 | PINTURA SOBRE ACO/TUBOS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19.04", "Descricao": "PINTURA SOBRE MADEIRA", "Label": "OBR | 10060 CUSTO | 01.19.04 | PINTURA SOBRE MADEIRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19.05", "Descricao": "CAIACAO POCO DE ELEVADOR", "Label": "OBR | 10060 CUSTO | 01.19.05 | CAIACAO POCO DE ELEVADOR"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.19.06", "Descricao": "PINTURA SOBRE PISO", "Label": "OBR | 10060 CUSTO | 01.19.06 | PINTURA SOBRE PISO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.20", "Descricao": "PAISAGISMO", "Label": "OBR | 10060 CUSTO | 01.20 | PAISAGISMO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.20.01", "Descricao": "PAISAGISMO", "Label": "OBR | 10060 CUSTO | 01.20.01 | PAISAGISMO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.21", "Descricao": "SERVICOS COMPLEMENTARES", "Label": "OBR | 10060 CUSTO | 01.21 | SERVICOS COMPLEMENTARES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.21.01", "Descricao": "SERVICOS COMPLEMENTARES", "Label": "OBR | 10060 CUSTO | 01.21.01 | SERVICOS COMPLEMENTARES"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.21.02", "Descricao": "COMUNICACAO VISUAL", "Label": "OBR | 10060 CUSTO | 01.21.02 | COMUNICACAO VISUAL"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.22", "Descricao": "LIMPEZA DE OBRA / SERVICOS FINAIS", "Label": "OBR | 10060 CUSTO | 01.22 | LIMPEZA DE OBRA / SERVICOS FINAIS"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.22.01", "Descricao": "LIMPEZA PERMANENTE DE OBRA", "Label": "OBR | 10060 CUSTO | 01.22.01 | LIMPEZA PERMANENTE DE OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.22.02", "Descricao": "REMOCAO DE ENTULHO", "Label": "OBR | 10060 CUSTO | 01.22.02 | REMOCAO DE ENTULHO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.22.03", "Descricao": "LIMPEZA FINAL DE OBRA", "Label": "OBR | 10060 CUSTO | 01.22.03 | LIMPEZA FINAL DE OBRA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "01.22.04", "Descricao": "CONSULTORIAS PARA ENTREGA", "Label": "OBR | 10060 CUSTO | 01.22.04 | CONSULTORIAS PARA ENTREGA"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "02.01", "Descricao": "TAXA DE ADMINISTRACAO DE OBRA (CONSTRUTORA)", "Label": "OBR | 10060 CUSTO | 02.01 | TAXA DE ADMINISTRACAO DE OBRA (CONSTRUTORA)"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "03.01", "Descricao": "CUSTO OBRA MASTERPLAN PARA A SPE", "Label": "OBR | 10060 CUSTO | 03.01 | CUSTO OBRA MASTERPLAN PARA A SPE"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "04.01", "Descricao": "AREA COMUM", "Label": "OBR | 10060 CUSTO | 04.01 | AREA COMUM"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "04.02", "Descricao": "APARTAMENTO", "Label": "OBR | 10060 CUSTO | 04.02 | APARTAMENTO"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "04.03", "Descricao": "TAXA DE ADMINISTRACAO DO FF&E", "Label": "OBR | 10060 CUSTO | 04.03 | TAXA DE ADMINISTRACAO DO FF&E"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "05.01", "Descricao": "OUTROS (MIGRACAO)", "Label": "OBR | 10060 CUSTO | 05.01 | OUTROS (MIGRACAO)"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "2", "Descricao": "ADMINISTRACAO DE OBRA (CONSTRUTORA)", "Label": "OBR | 10060 CUSTO | 2 | ADMINISTRACAO DE OBRA (CONSTRUTORA)"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "3", "Descricao": "CUSTO OBRA MASTERPLAN PARA A SPE", "Label": "OBR | 10060 CUSTO | 3 | CUSTO OBRA MASTERPLAN PARA A SPE"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "4", "Descricao": "MOBILIARIO DESIGN & EQUIPAMENTOS (FF&E)", "Label": "OBR | 10060 CUSTO | 4 | MOBILIARIO DESIGN & EQUIPAMENTOS (FF&E)"}, {"Obra": "OBR", "Produto": "10060 CUSTO", "Item": "5", "Descricao": "MIGRAÇÃO", "Label": "OBR | 10060 CUSTO | 5 | MIGRAÇÃO"}, {"Obra": "STV", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "STV | 10050 DEVOLUCAO/ESTORNO | 08.05 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "STV", "Produto": "10050 DEVOLUCAO/ESTORNO", "Item": "08.05.01", "Descricao": "DEVOLUCAO E ESTORNO (CONCILIACAO)", "Label": "STV | 10050 DEVOLUCAO/ESTORNO | 08.05.01 | DEVOLUCAO E ESTORNO (CONCILIACAO)"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19", "Descricao": "DESPESA ESTANDE DE VENDAS", "Label": "STV | 10070 DESPESA | 19 | DESPESA ESTANDE DE VENDAS"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.01", "Descricao": "CENTRAL DE VENDAS / UNIDADE MODELO", "Label": "STV | 10070 DESPESA | 19.01 | CENTRAL DE VENDAS / UNIDADE MODELO"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.01", "Descricao": "CONSTRUCAO ESTANDE DE VENDAS", "Label": "STV | 10070 DESPESA | 19.01 | CONSTRUCAO ESTANDE DE VENDAS"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.01", "Descricao": "ENXOVAL DO ESTANDE DE VENDAS", "Label": "STV | 10070 DESPESA | 19.01 | ENXOVAL DO ESTANDE DE VENDAS"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.01", "Descricao": "PDV EM CONTAINER", "Label": "STV | 10070 DESPESA | 19.01 | PDV EM CONTAINER"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.02", "Descricao": "CENTRAL DE VENDAS / UNIDADE MODELO (MANUTENCAO MENSAL)", "Label": "STV | 10070 DESPESA | 19.02 | CENTRAL DE VENDAS / UNIDADE MODELO (MANUTENCAO MENSAL)"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.02", "Descricao": "DESPESA MENSAL DE OPERACAO CENTRAL DE VENDAS", "Label": "STV | 10070 DESPESA | 19.02 | DESPESA MENSAL DE OPERACAO CENTRAL DE VENDAS"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.02", "Descricao": "MANUTENCAO ESTANDE DE VENDAS", "Label": "STV | 10070 DESPESA | 19.02 | MANUTENCAO ESTANDE DE VENDAS"}, {"Obra": "STV", "Produto": "10070 DESPESA", "Item": "19.02", "Descricao": "MANUTENCAO PDV EM CONTAINER", "Label": "STV | 10070 DESPESA | 19.02 | MANUTENCAO PDV EM CONTAINER"}];
 
-// ======================== STATE ========================
-let manualMappings = [];
-let aiMappings = [];
-let aiFileData = null;
-let aiDescs = [];
-let aiAccepted = {};
+let manualMappings=[], aiMappings=[], aiFileData=null, aiDescs=[], aiAccepted={};
+const OBRAS=[...new Set(EAP_DATA.map(e=>e.Obra))].sort();
+const STOPWORDS=new Set(['de','do','da','dos','das','em','com','para','por','e','a','o','no','na','os','as','ao','que','se','um','uma']);
 
-// ======================== INIT ========================
-const OBRAS = [...new Set(EAP_DATA.map(e => e.Obra))].sort();
-function init() {
-  ['aiObraFilter','manObra','eapObraFilter'].forEach(id => {
-    const sel = document.getElementById(id);
-    OBRAS.forEach(o => { const op = document.createElement('option'); op.value = o; op.textContent = o; sel.appendChild(op); });
+function init(){
+  ['aiObraFilter','manObra','eapObraFilter'].forEach(id=>{
+    const s=document.getElementById(id);
+    OBRAS.forEach(o=>{const op=document.createElement('option');op.value=o;op.textContent=o;s.appendChild(op)});
   });
-  updateManualOptions();
-  renderEAPTable();
-  document.getElementById('manData').valueAsDate = new Date();
+  updateManualOptions();renderEAPTable();
+  document.getElementById('manData').valueAsDate=new Date();
+  document.querySelectorAll('input[name="aiMode"]').forEach(r=>r.addEventListener('change',()=>{
+    document.getElementById('apiKeyArea').classList.toggle('hidden',r.value!=='api'||!r.checked);
+  }));
 }
 
-// ======================== TABS ========================
-function showTab(n) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', i===n));
-  document.querySelectorAll('.section').forEach((s,i) => s.classList.toggle('active', i===n));
+function showTab(n){
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===n));
+  document.querySelectorAll('.section').forEach((s,i)=>s.classList.toggle('active',i===n));
+}
+function escHTML(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+// ====================== NORMALIZE ======================
+function normalize(t){
+  if(!t)return'';
+  return t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+function tokenize(s){return new Set(s.split(' ').filter(t=>t.length>0))}
+function inter(a,b){return new Set([...a].filter(x=>b.has(x)))}
+function union(a,b){return new Set([...a,...b])}
+
+// ====================== SIMILARITY ======================
+function similarity(desc,eapDesc){
+  const dn=normalize(desc),en=normalize(eapDesc);
+  if(!dn||!en)return 0;
+  const dt=tokenize(dn),et=tokenize(en),common=inter(dt,et);
+  const u=union(dt,et);
+  const tokenScore=u.size>0?common.size/u.size:0;
+  const recall=dt.size>0?common.size/dt.size:0;
+  const sigD=new Set([...dt].filter(t=>!STOPWORDS.has(t)));
+  const sigE=new Set([...et].filter(t=>!STOPWORDS.has(t)));
+  const sigCommon=inter(sigD,sigE);
+  const sigScore=sigD.size>0?sigCommon.size/sigD.size:0;
+  const subBonus=(dn.includes(en)||en.includes(dn))?0.3:0;
+  let seqScore=0;const shorter=dn.length<en.length?dn:en,longer=dn.length<en.length?en:dn;
+  let m=0;for(let i=0;i<shorter.length;i++)if(shorter[i]===longer[i])m++;
+  seqScore=shorter.length>0?m/Math.max(dn.length,en.length):0;
+  return Math.min(1,seqScore*0.25+tokenScore*0.15+subBonus*0.1+recall*0.2+sigScore*0.3);
 }
 
-// ======================== NORMALIZE ========================
-function normalize(text) {
-  if (!text) return '';
-  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-// ======================== SIMILARITY ========================
-const STOPWORDS = new Set(['de','do','da','dos','das','em','com','para','por','e','a','o','no','na']);
-function tokenize(s) { return new Set(s.split(' ').filter(t => t.length > 0)); }
-function intersection(a, b) { return new Set([...a].filter(x => b.has(x))); }
-function union(a, b) { return new Set([...a, ...b]); }
-
-function similarity(desc, eapDesc) {
-  const dn = normalize(desc), en = normalize(eapDesc);
-  if (!dn || !en) return 0;
-  const dt = tokenize(dn), et = tokenize(en);
-  const common = intersection(dt, et);
-  // Token score (Jaccard)
-  const u = union(dt, et);
-  const tokenScore = u.size > 0 ? common.size / u.size : 0;
-  // Recall
-  const recall = dt.size > 0 ? common.size / dt.size : 0;
-  // Significant tokens
-  const sigD = new Set([...dt].filter(t => !STOPWORDS.has(t)));
-  const sigE = new Set([...et].filter(t => !STOPWORDS.has(t)));
-  const sigCommon = intersection(sigD, sigE);
-  const sigScore = sigD.size > 0 ? sigCommon.size / sigD.size : 0;
-  // Substring bonus
-  const subBonus = (dn.includes(en) || en.includes(dn)) ? 0.3 : 0;
-  // Sequence similarity (simplified)
-  let seqScore = 0;
-  const shorter = dn.length < en.length ? dn : en;
-  const longer = dn.length < en.length ? en : dn;
-  let matches = 0;
-  for (let i = 0; i < shorter.length; i++) { if (shorter[i] === longer[i]) matches++; }
-  seqScore = shorter.length > 0 ? matches / Math.max(dn.length, en.length) : 0;
-  // Combined
-  return Math.min(1, seqScore * 0.25 + tokenScore * 0.15 + subBonus * 0.1 + recall * 0.2 + sigScore * 0.3);
-}
-
-function suggest(desc, obraFilter, topN) {
-  topN = topN || 5;
-  let data = EAP_DATA;
-  if (obraFilter && obraFilter !== 'TODAS') data = data.filter(e => e.Obra === obraFilter);
-  const results = [];
-  data.forEach(item => {
-    const score = similarity(desc, item.Descricao);
-    if (score >= 0.2) results.push({ ...item, Score: Math.round(score * 100) / 100 });
+function suggestOffline(desc,obraFilter,topN=5){
+  let data=EAP_DATA;
+  if(obraFilter&&obraFilter!=='TODAS')data=data.filter(e=>e.Obra===obraFilter);
+  const results=[];
+  data.forEach(item=>{
+    const score=similarity(desc,item.Descricao);
+    if(score>=0.05)results.push({...item,Score:Math.round(score*100)/100});
   });
-  results.sort((a, b) => b.Score - a.Score);
-  return results.slice(0, topN);
+  results.sort((a,b)=>b.Score-a.Score);
+  return results.slice(0,topN);
 }
 
-// ======================== AI TAB ========================
-function setAISource(type) {
-  document.getElementById('aiTextArea').classList.toggle('hidden', type !== 'text');
-  document.getElementById('aiFileArea').classList.toggle('hidden', type !== 'file');
-  document.getElementById('btnSrcText').classList.toggle('secondary', type !== 'text');
-  document.getElementById('btnSrcFile').classList.toggle('secondary', type !== 'file');
+// ====================== CLAUDE API ======================
+async function callClaudeAPI(descriptions, obraFilter){
+  const apiKey=document.getElementById('apiKey').value.trim();
+  if(!apiKey){alert('Insira a API Key da Anthropic.');return null;}
+
+  let eapContext='ESTRUTURA EAP - Opcoes disponiveis:\nFormato: Obra | Produto | Item | Descricao\n';
+  let data=EAP_DATA;
+  if(obraFilter&&obraFilter!=='TODAS')data=data.filter(e=>e.Obra===obraFilter);
+  data.forEach(e=>{eapContext+=e.Obra+' | '+e.Produto+' | '+e.Item+' | '+e.Descricao+'\n'});
+
+  const BATCH=50;
+  const allResults={};
+  const total=descriptions.length;
+  const batches=[];
+  for(let i=0;i<total;i+=BATCH)batches.push(descriptions.slice(i,i+BATCH));
+
+  for(let b=0;b<batches.length;b++){
+    const batch=batches[b];
+    const pct=Math.round(((b+1)/batches.length)*100);
+    document.getElementById('aiProgressText').textContent='Analisando lote '+(b+1)+'/'+batches.length+'...';
+    document.getElementById('aiProgressBar').style.width=pct+'%';
+
+    const itemsText=batch.map((d,i)=>(i+1)+'. "'+d+'"').join('\n');
+
+    const prompt=`Voce e um especialista em contabilidade e gestao de empreendimentos imobiliarios.
+
+Abaixo esta a estrutura de EAP (Plano de Contas):
+
+${eapContext}
+
+Analise os seguintes lancamentos e sugira para qual item da EAP cada um deve ser apropriado. Para cada um, sugira ate 3 opcoes.
+
+LANCAMENTOS:
+${itemsText}
+
+Responda EXCLUSIVAMENTE em JSON valido (sem markdown):
+{"mapeamentos":[{"descricao_original":"texto","sugestoes":[{"obra":"SIGLA","produto":"codigo","item":"codigo","descricao_eap":"descricao","confianca":0.95,"justificativa":"explicacao"}]}]}`;
+
+    try{
+      const resp=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'x-api-key':apiKey,
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
+        body:JSON.stringify({
+          model:'claude-sonnet-4-5-20250929',
+          max_tokens:4096,
+          messages:[{role:'user',content:prompt}]
+        })
+      });
+
+      if(!resp.ok){
+        const err=await resp.text();
+        throw new Error('API erro '+resp.status+': '+err);
+      }
+
+      const result=await resp.json();
+      const text=result.content[0].text;
+      let parsed;
+      try{parsed=JSON.parse(text)}catch(e){
+        const m=text.match(/\{[\s\S]*\}/);
+        if(m)parsed=JSON.parse(m[0]);else throw new Error('Resposta invalida da API');
+      }
+
+      (parsed.mapeamentos||[]).forEach(item=>{
+        const sugs=(item.sugestoes||[]).map(s=>({
+          Label:s.obra+' | '+s.produto+' | '+s.item+' | '+s.descricao_eap,
+          Obra:s.obra,Produto:s.produto||'',Item:s.item,
+          Descricao:s.descricao_eap,Score:s.confianca||0.5,
+          Justificativa:s.justificativa||''
+        }));
+        allResults[item.descricao_original]=sugs;
+      });
+    }catch(e){
+      console.error(e);
+      // Fallback: usar offline para este lote
+      batch.forEach(desc=>{
+        if(!allResults[desc]){
+          const offline=suggestOffline(desc,obraFilter,3);
+          allResults[desc]=offline.map(s=>({...s,Justificativa:'(similaridade textual - fallback)'}));
+        }
+      });
+    }
+  }
+  return allResults;
 }
 
-function handleAIFile(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const wb = XLSX.read(e.target.result, { type: 'array' });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    aiFileData = XLSX.utils.sheet_to_json(ws);
-    if (aiFileData.length === 0) return;
-    const cols = Object.keys(aiFileData[0]);
-    const sel = document.getElementById('aiColSelect');
-    sel.innerHTML = '';
-    cols.forEach(c => { const op = document.createElement('option'); op.value = c; op.textContent = c; sel.appendChild(op); });
+// ====================== AI TAB ======================
+function setAISource(type){
+  document.getElementById('aiTextArea').classList.toggle('hidden',type!=='text');
+  document.getElementById('aiFileArea').classList.toggle('hidden',type!=='file');
+  document.getElementById('btnSrcText').classList.toggle('secondary',type!=='text');
+  document.getElementById('btnSrcFile').classList.toggle('secondary',type!=='file');
+}
+
+function handleAIFile(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const wb=XLSX.read(e.target.result,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    aiFileData=XLSX.utils.sheet_to_json(ws);
+    if(!aiFileData.length)return;
+    const cols=Object.keys(aiFileData[0]);
+    const sel=document.getElementById('aiColSelect');
+    sel.innerHTML='';
+    cols.forEach(c=>{const op=document.createElement('option');op.value=c;op.textContent=c;sel.appendChild(op)});
     document.getElementById('aiFilePreview').classList.remove('hidden');
-    document.getElementById('aiFileInfo').textContent = aiFileData.length + ' linhas carregadas';
+    document.getElementById('aiFileInfo').textContent=aiFileData.length+' linhas carregadas';
     updateAIDescs();
   };
   reader.readAsArrayBuffer(file);
 }
 
-function updateAIDescs() {
-  if (!aiFileData) return;
-  const col = document.getElementById('aiColSelect').value;
-  aiDescs = aiFileData.map(r => String(r[col] || '')).filter(d => d.trim());
+function updateAIDescs(){
+  if(!aiFileData)return;
+  const col=document.getElementById('aiColSelect').value;
+  aiDescs=aiFileData.map(r=>String(r[col]||'')).filter(d=>d.trim());
+  document.getElementById('aiFileInfo').textContent=aiDescs.length+' descricoes encontradas';
 }
 
-function runAIAnalysis() {
-  const obra = document.getElementById('aiObraFilter').value;
-  // Get descriptions
-  let descs = [];
-  if (!document.getElementById('aiTextArea').classList.contains('hidden')) {
-    const text = document.getElementById('aiText').value;
-    descs = text.split('\n').map(l => l.trim()).filter(l => l);
-  } else {
-    descs = aiDescs;
-  }
-  if (descs.length === 0) { alert('Insira pelo menos uma descricao.'); return; }
+async function runAnalysis(){
+  const mode=document.querySelector('input[name="aiMode"]:checked').value;
+  const obra=document.getElementById('aiObraFilter').value;
 
-  aiAccepted = {};
-  const container = document.getElementById('aiResultsList');
-  container.innerHTML = '';
+  let descs=[];
+  if(!document.getElementById('aiTextArea').classList.contains('hidden')){
+    descs=document.getElementById('aiText').value.split('\n').map(l=>l.trim()).filter(l=>l);
+  }else{descs=aiDescs}
+  if(!descs.length){alert('Insira pelo menos uma descricao.');return}
 
-  descs.forEach((desc, idx) => {
-    const suggestions = suggest(desc, obra, 5);
-    let html = '<div style="background:#1a1b26;border:1px solid #333;border-radius:8px;padding:15px;margin-bottom:12px">';
-    html += '<div style="font-weight:600;font-size:15px;margin-bottom:10px;color:#fff">' + escHTML(desc) + '</div>';
-    if (suggestions.length > 0) {
-      suggestions.forEach((s, si) => {
-        const pct = Math.round(s.Score * 100);
-        html += '<div class="suggestion' + (si === 0 ? ' selected' : '') + '" onclick="selectSuggestion(' + idx + ',' + si + ',this)" data-idx="' + idx + '" data-label="' + escHTML(s.Label) + '">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-        html += '<span><strong>' + escHTML(s.Obra) + '</strong> | ' + escHTML(s.Item) + ' | ' + escHTML(s.Descricao) + '</span>';
-        html += '<span style="color:#1f77b4;font-weight:600">' + pct + '%</span>';
-        html += '</div>';
-        html += '<div class="score-bar"><div class="score-fill" style="width:' + pct + '%"></div></div>';
-        html += '</div>';
-      });
-      aiAccepted[idx] = { desc: desc, label: suggestions[0].Label, item: suggestions[0] };
-    } else {
-      html += '<div class="alert alert-warn">Nenhuma sugestao encontrada</div>';
+  document.getElementById('btnAnalyze').disabled=true;
+  document.getElementById('aiProgress').classList.remove('hidden');
+  document.getElementById('aiProgressBar').style.width='0%';
+  document.getElementById('aiProgressText').textContent='Analisando '+descs.length+' lancamentos...';
+
+  aiAccepted={};
+  let results;
+
+  if(mode==='api'){
+    results=await callClaudeAPI(descs,obra);
+    if(!results){
+      document.getElementById('btnAnalyze').disabled=false;
+      document.getElementById('aiProgress').classList.add('hidden');
+      return;
     }
-    html += '</div>';
-    container.innerHTML += html;
+  }else{
+    results={};
+    descs.forEach((desc,i)=>{
+      results[desc]=suggestOffline(desc,obra,5);
+      const pct=Math.round(((i+1)/descs.length)*100);
+      document.getElementById('aiProgressBar').style.width=pct+'%';
+    });
+  }
+
+  document.getElementById('aiProgressBar').style.width='100%';
+  document.getElementById('aiProgressText').textContent='Concluido!';
+
+  renderAIResults(descs,results,obra);
+  document.getElementById('btnAnalyze').disabled=false;
+
+  setTimeout(()=>document.getElementById('aiProgress').classList.add('hidden'),2000);
+}
+
+function renderAIResults(descs,results,obra){
+  const container=document.getElementById('aiResultsList');
+  container.innerHTML='';
+  let mappedCount=0, totalCount=descs.length;
+
+  const eapLabels=new Set(EAP_DATA.map(e=>e.Label));
+
+  descs.forEach((desc,idx)=>{
+    const suggestions=results[desc]||[];
+    let h='<div style="background:#1a1b26;border:1px solid #333;border-radius:8px;padding:15px;margin-bottom:12px">';
+    h+='<div style="font-weight:600;font-size:15px;margin-bottom:10px;color:#fff">'+escHTML(desc)+'</div>';
+    if(suggestions.length>0){
+      mappedCount++;
+      suggestions.forEach((s,si)=>{
+        const pct=Math.round((s.Score||0)*100);
+        const color=pct>=70?'#4ade80':pct>=40?'#fb923c':'#60a5fa';
+        h+='<div class="suggestion'+(si===0?' selected':'')+'" onclick="selectSug('+idx+','+si+',this)" data-idx="'+idx+'" data-si="'+si+'">';
+        h+='<div style="display:flex;justify-content:space-between;align-items:center">';
+        h+='<span><strong>'+escHTML(s.Obra||'')+'</strong> | '+escHTML(s.Item||'')+' | '+escHTML(s.Descricao||'')+'</span>';
+        h+='<span style="color:'+color+';font-weight:600">'+pct+'%</span>';
+        h+='</div>';
+        if(s.Justificativa)h+='<div style="font-size:12px;color:#888;margin-top:4px">'+escHTML(s.Justificativa)+'</div>';
+        h+='<div class="score-bar"><div class="score-fill" style="width:'+pct+'%;background:'+color+'"></div></div>';
+        h+='</div>';
+      });
+      aiAccepted[idx]={desc:desc,item:suggestions[0]};
+    }else{
+      h+='<div class="alert alert-warn">Nenhuma sugestao encontrada</div>';
+    }
+    h+='</div>';
+    container.innerHTML+=h;
   });
+
+  document.getElementById('aiMetrics').innerHTML=
+    '<div class="metric"><div class="num">'+totalCount+'</div><div class="lbl">Total</div></div>'+
+    '<div class="metric"><div class="num" style="color:#4ade80">'+mappedCount+'</div><div class="lbl">Com sugestao</div></div>'+
+    '<div class="metric"><div class="num" style="color:#fb923c">'+(totalCount-mappedCount)+'</div><div class="lbl">Sem sugestao</div></div>'+
+    '<div class="metric"><div class="num">'+Math.round(mappedCount/totalCount*100)+'%</div><div class="lbl">Taxa</div></div>';
+
   document.getElementById('aiResults').classList.remove('hidden');
 }
 
-function selectSuggestion(idx, si, el) {
-  const parent = el.closest('[style]');
-  parent.querySelectorAll('.suggestion').forEach(s => s.classList.remove('selected'));
+function selectSug(idx,si,el){
+  const parent=el.closest('div[style*="background:#1a1b26"]');
+  parent.querySelectorAll('.suggestion').forEach(s=>s.classList.remove('selected'));
   el.classList.add('selected');
-  const label = el.getAttribute('data-label');
-  const item = EAP_DATA.find(e => e.Label === label);
-  const desc = aiAccepted[idx] ? aiAccepted[idx].desc : '';
-  aiAccepted[idx] = { desc: desc, label: label, item: item };
+  const descs=Object.values(aiAccepted);
+  const desc=aiAccepted[idx]?aiAccepted[idx].desc:'';
+  // Find the suggestion data
+  const allSugs=el.closest('div[style*="background:#1a1b26"]').querySelectorAll('.suggestion');
+  // Re-read from rendered data
+  const results=document.getElementById('aiResults');
+  // Simple: store reference
+  aiAccepted[idx]={desc:desc,si:si,el:el};
 }
 
-function confirmAIMappings() {
-  aiMappings = [];
-  Object.values(aiAccepted).forEach(a => {
-    if (a.item) {
+function confirmAIMappings(){
+  aiMappings=[];
+  Object.values(aiAccepted).forEach(a=>{
+    if(a.item){
       aiMappings.push({
-        Descricao_Original: a.desc,
-        EAP_Obra: a.item.Obra,
-        EAP_Produto: a.item.Produto,
-        EAP_Item: a.item.Item,
-        EAP_Descricao: a.item.Descricao,
-        Status: 'Mapeado'
+        Descricao_Original:a.desc,
+        EAP_Obra:a.item.Obra||'',EAP_Produto:a.item.Produto||'',
+        EAP_Item:a.item.Item||'',EAP_Descricao:a.item.Descricao||'',
+        Score:a.item.Score||'',Justificativa:a.item.Justificativa||'',
+        Status:'Mapeado'
       });
     }
   });
-  alert('Mapeamentos confirmados: ' + aiMappings.length + ' itens');
+  if(aiMappings.length===0){alert('Nenhum mapeamento para confirmar.');return}
+  alert('Mapeamentos confirmados: '+aiMappings.length+' itens.\nClique em "Exportar para Excel" para baixar.');
 }
 
-// ======================== MANUAL TAB ========================
-function updateManualOptions() {
-  const obra = document.getElementById('manObra').value;
-  const sel = document.getElementById('manItem');
-  sel.innerHTML = '';
-  let data = EAP_DATA;
-  if (obra !== 'TODAS') data = data.filter(e => e.Obra === obra);
-  data.forEach(e => { const op = document.createElement('option'); op.value = e.Label; op.textContent = e.Label; sel.appendChild(op); });
-  updateManualPreview();
-  sel.onchange = updateManualPreview;
+// ====================== MANUAL ======================
+function updateManualOptions(){
+  const obra=document.getElementById('manObra').value;
+  const sel=document.getElementById('manItem');sel.innerHTML='';
+  let data=EAP_DATA;
+  if(obra!=='TODAS')data=data.filter(e=>e.Obra===obra);
+  data.forEach(e=>{const op=document.createElement('option');op.value=e.Label;op.textContent=e.Label;sel.appendChild(op)});
+  sel.onchange=updateManualPreview;updateManualPreview();
 }
-
-function updateManualPreview() {
-  const label = document.getElementById('manItem').value;
-  const item = EAP_DATA.find(e => e.Label === label);
-  const div = document.getElementById('manPreview');
-  if (item) {
-    div.innerHTML = '<strong>Obra:</strong> ' + item.Obra + '<br><strong>Produto:</strong> ' + item.Produto + '<br><strong>Item:</strong> ' + item.Item + '<br><strong>Descricao:</strong> ' + item.Descricao;
-  }
+function updateManualPreview(){
+  const label=document.getElementById('manItem').value;
+  const item=EAP_DATA.find(e=>e.Label===label);
+  const div=document.getElementById('manPreview');
+  if(item)div.innerHTML='<strong>Obra:</strong> '+item.Obra+'<br><strong>Produto:</strong> '+item.Produto+'<br><strong>Item:</strong> '+item.Item+'<br><strong>Descricao:</strong> '+item.Descricao;
 }
-
-function saveManualMapping() {
-  const desc = document.getElementById('manDesc').value;
-  if (!desc) { alert('Preencha a descricao.'); return; }
-  const label = document.getElementById('manItem').value;
-  const item = EAP_DATA.find(e => e.Label === label);
-  const m = {
-    Descricao_Original: desc,
-    Valor: parseFloat(document.getElementById('manValor').value) || 0,
-    Tipo: document.getElementById('manTipo').value,
-    Data: document.getElementById('manData').value,
-    Fornecedor: document.getElementById('manForn').value,
-    EAP_Obra: item ? item.Obra : '',
-    EAP_Item: item ? item.Item : '',
-    EAP_Descricao: item ? item.Descricao : ''
-  };
+function saveManualMapping(){
+  const desc=document.getElementById('manDesc').value;if(!desc){alert('Preencha a descricao.');return}
+  const label=document.getElementById('manItem').value;const item=EAP_DATA.find(e=>e.Label===label);
+  const m={Descricao_Original:desc,Valor:parseFloat(document.getElementById('manValor').value)||0,
+    Tipo:document.getElementById('manTipo').value,Data:document.getElementById('manData').value,
+    Fornecedor:document.getElementById('manForn').value,
+    EAP_Obra:item?item.Obra:'',EAP_Item:item?item.Item:'',EAP_Descricao:item?item.Descricao:''};
   manualMappings.push(m);
-  const tbody = document.querySelector('#manTable tbody');
-  const tr = document.createElement('tr');
-  tr.innerHTML = '<td>'+escHTML(m.Descricao_Original)+'</td><td>R$ '+m.Valor.toFixed(2)+'</td><td>'+m.Tipo+'</td><td>'+m.Data+'</td><td>'+escHTML(m.Fornecedor)+'</td><td>'+m.EAP_Obra+'</td><td>'+m.EAP_Item+'</td><td>'+escHTML(m.EAP_Descricao)+'</td>';
+  const tbody=document.querySelector('#manTable tbody');const tr=document.createElement('tr');
+  tr.innerHTML='<td>'+escHTML(m.Descricao_Original)+'</td><td>R$ '+m.Valor.toFixed(2)+'</td><td>'+m.Tipo+'</td><td>'+m.Data+'</td><td>'+escHTML(m.Fornecedor)+'</td><td>'+m.EAP_Obra+'</td><td>'+m.EAP_Item+'</td><td>'+escHTML(m.EAP_Descricao)+'</td>';
   tbody.appendChild(tr);
   document.getElementById('manResults').classList.remove('hidden');
-  document.getElementById('manDesc').value = '';
-  document.getElementById('manValor').value = '0';
-  document.getElementById('manForn').value = '';
+  document.getElementById('manDesc').value='';document.getElementById('manForn').value='';
 }
 
-// ======================== EAP TAB ========================
-function renderEAPTable() {
-  const obra = document.getElementById('eapObraFilter').value;
-  const search = normalize(document.getElementById('eapSearch').value);
-  let data = EAP_DATA;
-  if (obra !== 'TODAS') data = data.filter(e => e.Obra === obra);
-  if (search) data = data.filter(e => normalize(e.Label).includes(search));
-  const tbody = document.querySelector('#eapTable tbody');
-  tbody.innerHTML = '';
-  data.forEach(e => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+e.Obra+'</td><td>'+escHTML(e.Produto)+'</td><td>'+e.Item+'</td><td>'+escHTML(e.Descricao)+'</td>';
-    tbody.appendChild(tr);
-  });
-  document.getElementById('eapMetrics').innerHTML =
-    '<div class="metric"><div class="num">'+data.length+'</div><div class="lbl">Registros</div></div>' +
-    '<div class="metric"><div class="num">'+new Set(data.map(e=>e.Obra)).size+'</div><div class="lbl">Obras</div></div>' +
+// ====================== EAP TABLE ======================
+function renderEAPTable(){
+  const obra=document.getElementById('eapObraFilter').value;
+  const search=normalize(document.getElementById('eapSearch').value);
+  let data=EAP_DATA;
+  if(obra!=='TODAS')data=data.filter(e=>e.Obra===obra);
+  if(search)data=data.filter(e=>normalize(e.Label).includes(search));
+  const tbody=document.querySelector('#eapTable tbody');tbody.innerHTML='';
+  data.forEach(e=>{const tr=document.createElement('tr');
+    tr.innerHTML='<td>'+e.Obra+'</td><td>'+escHTML(e.Produto)+'</td><td>'+e.Item+'</td><td>'+escHTML(e.Descricao)+'</td>';
+    tbody.appendChild(tr)});
+  document.getElementById('eapMetrics').innerHTML=
+    '<div class="metric"><div class="num">'+data.length+'</div><div class="lbl">Registros</div></div>'+
+    '<div class="metric"><div class="num">'+new Set(data.map(e=>e.Obra)).size+'</div><div class="lbl">Obras</div></div>'+
     '<div class="metric"><div class="num">'+new Set(data.map(e=>e.Produto)).size+'</div><div class="lbl">Produtos</div></div>';
 }
 
-// ======================== EXPORT ========================
-function toSheet(data) {
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'DE-PARA');
-  return wb;
-}
-function exportEAP() { XLSX.writeFile(toSheet(EAP_DATA), 'eap_completa.xlsx'); }
-function exportManual() { if(manualMappings.length===0){alert('Nenhum mapeamento manual.');return;} XLSX.writeFile(toSheet(manualMappings), 'de_para_manual.xlsx'); }
-function exportAIResults() { if(aiMappings.length===0){alert('Confirme os mapeamentos IA primeiro.');return;} XLSX.writeFile(toSheet(aiMappings), 'de_para_ia.xlsx'); }
-function exportAll() {
-  const all = [...manualMappings, ...aiMappings];
-  if(all.length===0){alert('Nenhum mapeamento.');return;}
-  XLSX.writeFile(toSheet(all), 'de_para_completo.xlsx');
-}
-
-function escHTML(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+// ====================== EXPORT ======================
+function toSheet(data){const ws=XLSX.utils.json_to_sheet(data);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'DE-PARA');return wb}
+function exportEAP(){XLSX.writeFile(toSheet(EAP_DATA),'eap_completa.xlsx')}
+function exportManual(){if(!manualMappings.length){alert('Nenhum mapeamento manual.');return}XLSX.writeFile(toSheet(manualMappings),'de_para_manual.xlsx')}
+function exportAIResults(){if(!aiMappings.length){alert('Confirme os mapeamentos primeiro.');return}XLSX.writeFile(toSheet(aiMappings),'de_para_ia.xlsx')}
+function exportAll(){const all=[...manualMappings,...aiMappings];if(!all.length){alert('Nenhum mapeamento.');return}XLSX.writeFile(toSheet(all),'de_para_completo.xlsx')}
 
 init();
 </script>
