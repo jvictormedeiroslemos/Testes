@@ -30,10 +30,10 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--trinus-dark);color:var(--trinus-text);min-height:100vh;-webkit-font-smoothing:antialiased}
-.header{background:var(--trinus-panel);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:68px;border-bottom:1px solid var(--trinus-border)}
+.header{background:var(--trinus-panel);padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:72px;border-bottom:1px solid var(--trinus-border)}
 .header-left{display:flex;align-items:center;gap:20px}
 .header-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
-.header-logo svg{width:160px;height:48px}
+.header-logo svg{width:180px;height:48px}
 .header-logo span{font-size:22px;font-weight:700;color:var(--trinus-text);letter-spacing:-0.5px}
 .header-divider{width:1px;height:32px;background:var(--trinus-border-light)}
 .header-title{display:flex;flex-direction:column}
@@ -106,22 +106,26 @@ tr:hover{background:rgba(0,102,255,0.04)}
 <div class="header">
 <div class="header-left">
 <a class="header-logo" href="#">
-<svg viewBox="0 0 120 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 180 48" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="logoGrad1" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#00D4FF"/>
-      <stop offset="100%" stop-color="#0066FF"/>
+    <linearGradient id="logoGrad1" x1="0" y1="0" x2="45" y2="40" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#29D5F8"/>
+      <stop offset="100%" stop-color="#0088FF"/>
     </linearGradient>
-    <linearGradient id="logoGrad2" x1="8" y1="8" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#0066FF"/>
-      <stop offset="100%" stop-color="#0044CC"/>
+    <linearGradient id="logoGrad2" x1="10" y1="15" x2="40" y2="45" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0099FF"/>
+      <stop offset="100%" stop-color="#0055DD"/>
     </linearGradient>
   </defs>
-  <!-- Trinus arrow/triangle logo mark -->
-  <path d="M2 20L18 4L22 8L10 20L22 32L18 36Z" fill="url(#logoGrad1)"/>
-  <path d="M12 20L22 10L26 14L18 20L26 26L22 30Z" fill="url(#logoGrad2)" opacity="0.85"/>
+  <!-- Trinus paper-plane / arrow logo mark -->
+  <!-- Upper triangle (lighter cyan) - main body pointing right -->
+  <polygon points="2,18 38,4 28,24" fill="url(#logoGrad1)"/>
+  <!-- Lower triangle (darker blue) - shadow/depth -->
+  <polygon points="2,18 28,24 38,44" fill="url(#logoGrad2)"/>
+  <!-- Center accent triangle - adds dimension -->
+  <polygon points="14,18 28,24 38,12" fill="#00BBFF" opacity="0.5"/>
   <!-- trinus text -->
-  <text x="34" y="27" fill="#F0F4F8" font-family="Inter,system-ui,sans-serif" font-size="18" font-weight="700" letter-spacing="-0.5">trinus</text>
+  <text x="48" y="32" fill="#F0F4F8" font-family="Inter,system-ui,sans-serif" font-size="24" font-weight="700" letter-spacing="0.5">trinus</text>
 </svg>
 </a>
 <div class="header-divider"></div>
