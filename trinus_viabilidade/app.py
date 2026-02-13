@@ -139,6 +139,99 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 st.title("Gerador de Premissas de Viabilidade Imobiliária")
 
+
+# =====================================================================
+# Funções auxiliares de renderização
+# =====================================================================
+def _renderizar_premissas(premissas: list, editadas: dict):
+    """Renderiza uma lista de premissas com campos editáveis."""
+    if not premissas:
+        st.info("Nenhuma premissa nesta categoria.")
+        return
+
+    # Agrupar por subcategoria
+    subcategorias: dict[str, list] = {}
+    for p in premissas:
+        subcategorias.setdefault(p.subcategoria, []).append(p)
+
+    for subcat, lista in subcategorias.items():
+        st.markdown(f"#### {subcat}")
+
+        for p in lista:
+            with st.container():
+                col_nome, col_valor, col_range, col_fonte = st.columns([3, 2, 2, 3])
+
+                with col_nome:
+                    st.markdown(f"**{p.nome}**")
+                    if p.descricao and p.descricao != p.nome:
+                        st.caption(p.descricao)
+
+                with col_valor:
+                    if p.editavel:
+                        # Determinar step e format baseado na unidade
+                        if p.unidade == "R$":
+                            step = 1000.0
+                            fmt = "%.2f"
+                        elif p.unidade == "R$/m²":
+                            step = 50.0
+                            fmt = "%.2f"
+                        elif "%" in p.unidade:
+                            step = 0.1
+                            fmt = "%.2f"
+                        elif p.unidade == "meses":
+                            step = 1.0
+                            fmt = "%.0f"
+                        elif p.unidade == "m²":
+                            step = 5.0
+                            fmt = "%.1f"
+                        else:
+                            step = 1.0
+                            fmt = "%.2f"
+
+                        novo_valor = st.number_input(
+                            f"{p.unidade}",
+                            min_value=0.0,
+                            value=float(editadas.get(p.nome, p.valor)),
+                            step=step,
+                            format=fmt,
+                            key=f"edit_{p.nome}",
+                            label_visibility="collapsed",
+                        )
+                        editadas[p.nome] = novo_valor
+                        st.caption(f"{p.unidade}")
+                    else:
+                        if p.unidade == "R$":
+                            st.markdown(f"**R$ {p.valor:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
+                        else:
+                            st.markdown(f"**{p.valor:,.2f} {p.unidade}**")
+
+                with col_range:
+                    if p.unidade == "R$":
+                        st.caption(
+                            f"Min: R$ {p.valor_min:,.0f}\n\n"
+                            f"Max: R$ {p.valor_max:,.0f}"
+                        )
+                    else:
+                        st.caption(
+                            f"Min: {p.valor_min:,.2f}\n\n"
+                            f"Max: {p.valor_max:,.2f}"
+                        )
+
+                with col_fonte:
+                    st.caption(f"Fonte: {p.fonte}")
+
+                st.markdown("---")
+
+    st.session_state["premissas_editadas"] = editadas
+
+
+def _aplicar_edicoes(resultado, editadas: dict):
+    """Aplica os valores editados pelo usuário nas premissas."""
+    for p in resultado.premissas:
+        if p.nome in editadas:
+            p.valor = editadas[p.nome]
+
+
 # =====================================================================
 # ETAPA 1: Dados do empreendimento (inputs obrigatórios)
 # =====================================================================
@@ -622,95 +715,3 @@ elif st.session_state["etapa"] == 4:
                 if api_key_backup:
                     st.session_state["anthropic_api_key"] = api_key_backup
                 st.rerun()
-
-
-# =====================================================================
-# Funções auxiliares de renderização
-# =====================================================================
-def _renderizar_premissas(premissas: list, editadas: dict):
-    """Renderiza uma lista de premissas com campos editáveis."""
-    if not premissas:
-        st.info("Nenhuma premissa nesta categoria.")
-        return
-
-    # Agrupar por subcategoria
-    subcategorias: dict[str, list] = {}
-    for p in premissas:
-        subcategorias.setdefault(p.subcategoria, []).append(p)
-
-    for subcat, lista in subcategorias.items():
-        st.markdown(f"#### {subcat}")
-
-        for p in lista:
-            with st.container():
-                col_nome, col_valor, col_range, col_fonte = st.columns([3, 2, 2, 3])
-
-                with col_nome:
-                    st.markdown(f"**{p.nome}**")
-                    if p.descricao and p.descricao != p.nome:
-                        st.caption(p.descricao)
-
-                with col_valor:
-                    if p.editavel:
-                        # Determinar step e format baseado na unidade
-                        if p.unidade == "R$":
-                            step = 1000.0
-                            fmt = "%.2f"
-                        elif p.unidade == "R$/m²":
-                            step = 50.0
-                            fmt = "%.2f"
-                        elif "%" in p.unidade:
-                            step = 0.1
-                            fmt = "%.2f"
-                        elif p.unidade == "meses":
-                            step = 1.0
-                            fmt = "%.0f"
-                        elif p.unidade == "m²":
-                            step = 5.0
-                            fmt = "%.1f"
-                        else:
-                            step = 1.0
-                            fmt = "%.2f"
-
-                        novo_valor = st.number_input(
-                            f"{p.unidade}",
-                            min_value=0.0,
-                            value=float(editadas.get(p.nome, p.valor)),
-                            step=step,
-                            format=fmt,
-                            key=f"edit_{p.nome}",
-                            label_visibility="collapsed",
-                        )
-                        editadas[p.nome] = novo_valor
-                        st.caption(f"{p.unidade}")
-                    else:
-                        if p.unidade == "R$":
-                            st.markdown(f"**R$ {p.valor:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
-                        else:
-                            st.markdown(f"**{p.valor:,.2f} {p.unidade}**")
-
-                with col_range:
-                    if p.unidade == "R$":
-                        st.caption(
-                            f"Min: R$ {p.valor_min:,.0f}\n\n"
-                            f"Max: R$ {p.valor_max:,.0f}"
-                        )
-                    else:
-                        st.caption(
-                            f"Min: {p.valor_min:,.2f}\n\n"
-                            f"Max: {p.valor_max:,.2f}"
-                        )
-
-                with col_fonte:
-                    st.caption(f"Fonte: {p.fonte}")
-
-                st.markdown("---")
-
-    st.session_state["premissas_editadas"] = editadas
-
-
-def _aplicar_edicoes(resultado, editadas: dict):
-    """Aplica os valores editados pelo usuário nas premissas."""
-    for p in resultado.premissas:
-        if p.nome in editadas:
-            p.valor = editadas[p.nome]
