@@ -112,11 +112,11 @@ with st.sidebar:
     # -----------------------------------------------------------------------
     st.subheader("Integração com IA")
     api_key = st.text_input(
-        "OpenAI API Key",
+        "Anthropic API Key",
         type="password",
-        key="openai_api_key",
-        help="Insira sua chave da API OpenAI para usar IA na sugestão de premissas. "
-             "Obtenha em platform.openai.com",
+        key="anthropic_api_key",
+        help="Insira sua chave da API Anthropic (Claude) para usar IA na sugestão de premissas. "
+             "Obtenha em console.anthropic.com",
     )
     if api_key:
         st.success("API Key configurada — IA ativada")
@@ -127,11 +127,11 @@ with st.sidebar:
 
     st.markdown("---")
     if st.button("Recomeçar", use_container_width=True):
-        api_key_backup = st.session_state.get("openai_api_key", "")
+        api_key_backup = st.session_state.get("anthropic_api_key", "")
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         if api_key_backup:
-            st.session_state["openai_api_key"] = api_key_backup
+            st.session_state["anthropic_api_key"] = api_key_backup
         st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ elif st.session_state["etapa"] == 2:
     )
 
     # Indicação se IA está ativa
-    api_key = st.session_state.get("openai_api_key", "")
+    api_key = st.session_state.get("anthropic_api_key", "")
     if api_key:
         st.success(
             "A IA está ativada e será usada para refinar as premissas "
@@ -408,7 +408,7 @@ elif st.session_state["etapa"] == 2:
 
             # Enriquecer com IA se API Key disponível
             ia_metadata = None
-            api_key = st.session_state.get("openai_api_key", "")
+            api_key = st.session_state.get("anthropic_api_key", "")
             if api_key:
                 with st.spinner("Refinando premissas com IA... Isso pode levar alguns segundos."):
                     resultado, ia_metadata = gerar_premissas_com_ia(
@@ -616,11 +616,11 @@ elif st.session_state["etapa"] == 4:
                 st.rerun()
         with col_btn2:
             if st.button("Nova Viabilidade", key="btn_etapa4_new", use_container_width=True):
-                api_key_backup = st.session_state.get("openai_api_key", "")
+                api_key_backup = st.session_state.get("anthropic_api_key", "")
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
                 if api_key_backup:
-                    st.session_state["openai_api_key"] = api_key_backup
+                    st.session_state["anthropic_api_key"] = api_key_backup
                 st.rerun()
 
 

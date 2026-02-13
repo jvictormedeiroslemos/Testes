@@ -1,7 +1,7 @@
 """
 Trinus Viabilidade - Motor de IA para sugestão de premissas.
 
-Utiliza a API OpenAI para refinar e enriquecer as premissas
+Utiliza a API Anthropic (Claude) para refinar e enriquecer as premissas
 geradas pelo motor estático, com base no conhecimento do mercado
 imobiliário local.
 """
@@ -106,34 +106,33 @@ def gerar_premissas_com_ia(
     api_key: str,
 ) -> tuple[ResultadoPremissas, dict]:
     """
-    Enriquece premissas usando IA (OpenAI API).
+    Enriquece premissas usando IA (Anthropic Claude API).
 
     Returns:
         Tupla (resultado_ajustado, ia_metadata) com insights e recomendações.
     """
     try:
-        from openai import OpenAI
+        from anthropic import Anthropic
     except ImportError:
         return resultado_base, {
-            "erro": "Pacote 'openai' não instalado. Adicione openai ao requirements.txt.",
+            "erro": "Pacote 'anthropic' não instalado. Adicione anthropic ao requirements.txt.",
         }
 
-    client = OpenAI(api_key=api_key)
+    client = Anthropic(api_key=api_key)
     user_prompt = _build_user_prompt(inputs, resultado_base)
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        response = client.messages.create(
+            model="claude-sonnet-4-5-20250929",
+            system=SYSTEM_PROMPT,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            response_format={"type": "json_object"},
             temperature=0.3,
             max_tokens=4000,
         )
 
-        resultado_ia = json.loads(response.choices[0].message.content)
+        resultado_ia = json.loads(response.content[0].text)
 
         ajustes = resultado_ia.get("premissas_ajustadas", {})
         ajustes_aplicados = 0
@@ -153,7 +152,7 @@ def gerar_premissas_com_ia(
         ia_metadata = {
             "insights": resultado_ia.get("insights", []),
             "recomendacoes": resultado_ia.get("recomendacoes", []),
-            "modelo": "gpt-4o-mini",
+            "modelo": "claude-sonnet-4-5-20250929",
             "ajustes_aplicados": ajustes_aplicados,
         }
 
