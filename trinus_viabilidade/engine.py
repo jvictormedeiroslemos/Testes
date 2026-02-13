@@ -19,20 +19,34 @@ from modelos import (
 from dados_mercado import (
     ALIQUOTAS_TRIBUTARIAS,
     AREA_PRIVATIVA_MEDIA,
+    BDI_ADMINISTRACAO_OBRA,
+    COORDENACAO_COMERCIAL,
     CUB_POR_REGIAO,
+    CUSTO_APROVACOES,
     CUSTO_INFRAESTRUTURA_LOTE,
+    CUSTO_PROJETOS,
     CUSTO_TERRENO_PCT_VGV,
     CURVA_DESEMBOLSO,
+    CURVA_VENDAS_FASES,
     DESPESAS_ADMINISTRATIVAS,
     DESPESAS_COMERCIAIS,
+    DESPESAS_PRE_OPERACIONAIS,
     DISTRATO,
-    INADIMPLENCIA,
+    INADIMPLENCIA_POR_TIPOLOGIA,
+    INDEXADORES_POR_TIPOLOGIA,
+    IPTU_TERRENO,
+    MESES_RECUPERACAO_INADIMPLENCIA,
     PRAZO_OBRA,
+    PRAZO_REGISTRO,
     PRECO_LOTE_M2,
     PRECO_VENDA_M2,
+    PREMIACAO_CORRETORES,
+    PREMISSAS_CRI,
     PREMISSAS_FINANCEIRAS,
     REGIME_SUGERIDO,
+    SEGUROS,
     TABELA_VENDAS,
+    TAXA_GESTAO,
     TAXAS_CARTORARIAS,
     VELOCIDADE_VENDAS,
 )
@@ -176,18 +190,32 @@ def _gerar_premissas_receita(
         descricao="Percentual do estoque vendido por mês (VSO mensal)",
     ))
 
-    # Inadimplência
-    ref_inad = INADIMPLENCIA[inputs.padrao]
+    # Inadimplência (por tipologia - diferenciada para loteamentos)
+    ref_inad = INADIMPLENCIA_POR_TIPOLOGIA[inputs.tipologia][inputs.padrao]
     resultado.premissas.append(Premissa(
         nome="Taxa de inadimplência estimada",
         valor=ref_inad["medio"],
         unidade="%",
         valor_min=ref_inad["min"],
         valor_max=ref_inad["max"],
-        fonte="Abrainc, SECOVI 2024",
+        fonte="Abrainc, SECOVI 2024, Checklist Viabilidade Trinus",
         categoria="Receita",
         subcategoria="Vendas",
         descricao="Percentual estimado de inadimplência sobre recebíveis",
+    ))
+
+    # Meses de recuperação de inadimplência
+    ref_recup = MESES_RECUPERACAO_INADIMPLENCIA[inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Meses de recuperação de inadimplência",
+        valor=ref_recup["medio"],
+        unidade="meses",
+        valor_min=ref_recup["min"],
+        valor_max=ref_recup["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Receita",
+        subcategoria="Vendas",
+        descricao="Prazo estimado para recuperação de créditos inadimplentes",
     ))
 
     # Distrato
@@ -202,6 +230,69 @@ def _gerar_premissas_receita(
         categoria="Receita",
         subcategoria="Vendas",
         descricao="Percentual estimado de distratos sobre vendas totais",
+    ))
+
+    # Curva de vendas por fase
+    ref_curva = CURVA_VENDAS_FASES[inputs.tipologia]["moderada"]
+    resultado.premissas.append(Premissa(
+        nome="Vendas no lançamento",
+        valor=ref_curva["lancamento"],
+        unidade="% do total",
+        valor_min=CURVA_VENDAS_FASES[inputs.tipologia]["pessimista"]["lancamento"],
+        valor_max=CURVA_VENDAS_FASES[inputs.tipologia]["otimista"]["lancamento"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Receita",
+        subcategoria="Curva de Vendas",
+        descricao="Percentual das vendas realizadas na fase de lançamento",
+    ))
+    resultado.premissas.append(Premissa(
+        nome="Vendas durante obra",
+        valor=ref_curva["obra"],
+        unidade="% do total",
+        valor_min=CURVA_VENDAS_FASES[inputs.tipologia]["otimista"]["obra"],
+        valor_max=CURVA_VENDAS_FASES[inputs.tipologia]["pessimista"]["obra"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Receita",
+        subcategoria="Curva de Vendas",
+        descricao="Percentual das vendas realizadas durante a fase de obra",
+    ))
+    resultado.premissas.append(Premissa(
+        nome="Vendas pós-obra",
+        valor=ref_curva["pos_obra"],
+        unidade="% do total",
+        valor_min=CURVA_VENDAS_FASES[inputs.tipologia]["otimista"]["pos_obra"],
+        valor_max=CURVA_VENDAS_FASES[inputs.tipologia]["pessimista"]["pos_obra"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Receita",
+        subcategoria="Curva de Vendas",
+        descricao="Percentual das vendas realizadas após conclusão da obra",
+    ))
+
+    # Indexadores de correção
+    idx = INDEXADORES_POR_TIPOLOGIA[inputs.tipologia]
+    resultado.premissas.append(Premissa(
+        nome="Indexador pré-chaves",
+        valor=0,
+        unidade=idx["pre_chaves"],
+        valor_min=0,
+        valor_max=0,
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Receita",
+        subcategoria="Indexadores",
+        descricao=f"Índice de correção das parcelas pré-chaves: {idx['pre_chaves']}",
+        editavel=False,
+    ))
+    resultado.premissas.append(Premissa(
+        nome="Indexador pós-chaves",
+        valor=0,
+        unidade=idx["pos_chaves"],
+        valor_min=0,
+        valor_max=0,
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Receita",
+        subcategoria="Indexadores",
+        descricao=f"Índice de correção das parcelas pós-chaves: {idx['pos_chaves']}",
+        editavel=False,
     ))
 
 
@@ -286,6 +377,61 @@ def _gerar_premissas_custo(
         descricao=f"Custo do terreno como percentual do VGV ({inputs.tipo_negociacao.value})",
     ))
 
+    # BDI / Taxa de administração de obra
+    ref_bdi = BDI_ADMINISTRACAO_OBRA[inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Taxa de administração de obra (BDI)",
+        valor=ref_bdi["medio"],
+        unidade="% sobre custo raso",
+        valor_min=ref_bdi["min"],
+        valor_max=ref_bdi["max"],
+        fonte="Checklist Viabilidade Trinus, DFC real",
+        categoria="Custo",
+        subcategoria="Construção",
+        descricao="Taxa de administração / BDI sobre o custo raso de obra",
+    ))
+
+    # Custo de projetos e consultorias
+    ref_proj = CUSTO_PROJETOS[inputs.tipologia][inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Custo de projetos e consultorias",
+        valor=ref_proj["medio"],
+        unidade="% do VGV",
+        valor_min=ref_proj["min"],
+        valor_max=ref_proj["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Custo",
+        subcategoria="Projetos e Aprovações",
+        descricao="Custo de projetos (arquitetônico, estrutural, instalações, etc.)",
+    ))
+
+    # Custo de aprovações e licenças
+    ref_aprov = CUSTO_APROVACOES[inputs.tipologia][inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Custo de aprovações e licenças",
+        valor=ref_aprov["medio"],
+        unidade="% do VGV",
+        valor_min=ref_aprov["min"],
+        valor_max=ref_aprov["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Custo",
+        subcategoria="Projetos e Aprovações",
+        descricao="Taxas municipais, estaduais e licenças para aprovação do empreendimento",
+    ))
+
+    # IPTU do terreno
+    resultado.premissas.append(Premissa(
+        nome="IPTU do terreno",
+        valor=IPTU_TERRENO["medio"],
+        unidade="% do valor do terreno/ano",
+        valor_min=IPTU_TERRENO["min"],
+        valor_max=IPTU_TERRENO["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Custo",
+        subcategoria="Terreno",
+        descricao="IPTU anual incidente sobre o terreno",
+    ))
+
     # Prazo de obra
     ref_prazo = PRAZO_OBRA[inputs.tipologia][inputs.padrao]
     resultado.premissas.append(Premissa(
@@ -298,6 +444,20 @@ def _gerar_premissas_custo(
         categoria="Custo",
         subcategoria="Cronograma",
         descricao="Prazo estimado para conclusão da obra",
+    ))
+
+    # Prazo para Registro de Incorporação / Loteamento
+    ref_ri = PRAZO_REGISTRO[inputs.tipologia]
+    resultado.premissas.append(Premissa(
+        nome="Prazo para Registro de Incorporação/Loteamento",
+        valor=ref_ri["medio"],
+        unidade="meses",
+        valor_min=ref_ri["min"],
+        valor_max=ref_ri["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Custo",
+        subcategoria="Cronograma",
+        descricao="Prazo estimado para obtenção do RI",
     ))
 
 
@@ -326,6 +486,34 @@ def _gerar_premissas_despesa(
             descricao=f"{label} como percentual do VGV",
         ))
 
+    # Coordenação comercial
+    ref_coord = COORDENACAO_COMERCIAL[inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Coordenação comercial",
+        valor=ref_coord["medio"],
+        unidade="% do VGV",
+        valor_min=ref_coord["min"],
+        valor_max=ref_coord["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Despesa",
+        subcategoria="Comercial",
+        descricao="Coordenação comercial como percentual do VGV",
+    ))
+
+    # Premiação de corretores
+    ref_prem = PREMIACAO_CORRETORES[inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Premiação de corretores",
+        valor=ref_prem["medio"],
+        unidade="% do VGV",
+        valor_min=ref_prem["min"],
+        valor_max=ref_prem["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Despesa",
+        subcategoria="Comercial",
+        descricao="Premiação sobre performance de vendas",
+    ))
+
     # Despesas administrativas
     ref_adm = DESPESAS_ADMINISTRATIVAS[inputs.padrao]
     resultado.premissas.append(Premissa(
@@ -337,7 +525,49 @@ def _gerar_premissas_despesa(
         fonte="Práticas de mercado",
         categoria="Despesa",
         subcategoria="Administrativa",
-        descricao="Despesas administrativas gerais como percentual do VGV",
+        descricao="Despesas administrativas gerais como percentual do VGV (3.5% a 5.5%)",
+    ))
+
+    # Taxa de gestão / Gerenciamento
+    ref_gestao = TAXA_GESTAO[inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Taxa de gestão do empreendimento",
+        valor=ref_gestao["medio"],
+        unidade="% do VGV",
+        valor_min=ref_gestao["min"],
+        valor_max=ref_gestao["max"],
+        fonte="Checklist Viabilidade Trinus, DFC real",
+        categoria="Despesa",
+        subcategoria="Administrativa",
+        descricao="Taxa de gerenciamento/gestão do empreendimento",
+    ))
+
+    # Seguros
+    ref_seg = SEGUROS[inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Seguros",
+        valor=ref_seg["medio"],
+        unidade="% do VGV",
+        valor_min=ref_seg["min"],
+        valor_max=ref_seg["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Despesa",
+        subcategoria="Administrativa",
+        descricao="Seguros (obra, responsabilidade civil, garantia de entrega)",
+    ))
+
+    # Despesas pré-operacionais
+    ref_preop = DESPESAS_PRE_OPERACIONAIS[inputs.padrao]
+    resultado.premissas.append(Premissa(
+        nome="Despesas pré-operacionais",
+        valor=ref_preop["medio"],
+        unidade="% do VGV",
+        valor_min=ref_preop["min"],
+        valor_max=ref_preop["max"],
+        fonte="Checklist Viabilidade Trinus",
+        categoria="Despesa",
+        subcategoria="Administrativa",
+        descricao="Constituição da SPE, registros iniciais e despesas pré-operacionais",
     ))
 
     # Despesas tributárias
@@ -394,6 +624,28 @@ def _gerar_premissas_financeiras(resultado: ResultadoPremissas):
 
     for chave, (nome, subcat) in mapeamento.items():
         ref = PREMISSAS_FINANCEIRAS[chave]
+        resultado.premissas.append(Premissa(
+            nome=nome,
+            valor=ref["medio"],
+            unidade=ref["unidade"],
+            valor_min=ref["min"],
+            valor_max=ref["max"],
+            fonte=ref["fonte"],
+            categoria="Financeiro",
+            subcategoria=subcat,
+            descricao=ref["descricao"],
+        ))
+
+    # Premissas CRI
+    mapeamento_cri = {
+        "taxa_cdi_spread": ("CRI - Spread sobre CDI", "CRI"),
+        "taxa_ipca_spread": ("CRI - Spread sobre IPCA", "CRI"),
+        "prazo_operacao": ("CRI - Prazo da operação", "CRI"),
+        "custo_emissao": ("CRI - Custos de emissão", "CRI"),
+    }
+
+    for chave, (nome, subcat) in mapeamento_cri.items():
+        ref = PREMISSAS_CRI[chave]
         resultado.premissas.append(Premissa(
             nome=nome,
             valor=ref["medio"],

@@ -85,6 +85,30 @@ def _tabela_vendas_para_dataframe(resultado: ResultadoPremissas) -> pd.DataFrame
     return pd.DataFrame(rows)
 
 
+def _resumo_dfc_dataframe(resultado: ResultadoPremissas) -> pd.DataFrame:
+    """Gera resumo consolidado no formato DFC."""
+    vgv_p = resultado.get_premissa("VGV estimado")
+    vgv_val = vgv_p.valor if vgv_p else 0
+
+    rows = []
+    for cat in ["Receita", "Custo", "Despesa", "Financeiro"]:
+        rows.append({"Categoria DFC": f"=== {cat.upper()} ===", "Premissa": "", "Valor": "", "Unidade": "", "Valor Estimado (R$)": ""})
+        for p in resultado.por_categoria(cat):
+            valor_abs = ""
+            if p.unidade == "R$":
+                valor_abs = f"R$ {p.valor:,.2f}"
+            elif ("% do VGV" in p.unidade or "% sobre receita" in p.unidade) and vgv_val > 0:
+                valor_abs = f"R$ {vgv_val * p.valor / 100:,.2f}"
+            rows.append({
+                "Categoria DFC": p.subcategoria,
+                "Premissa": p.nome,
+                "Valor": p.valor,
+                "Unidade": p.unidade,
+                "Valor Estimado (R$)": valor_abs,
+            })
+    return pd.DataFrame(rows)
+
+
 def exportar_excel_bytes(resultado: ResultadoPremissas) -> bytes:
     """Exporta premissas para bytes Excel (para download)."""
     buffer = BytesIO()
@@ -103,11 +127,19 @@ def exportar_excel_bytes(resultado: ResultadoPremissas) -> bytes:
         if not df_vendas.empty:
             df_vendas.to_excel(writer, index=False, sheet_name="Tabela de Vendas")
 
-        # Abas por categoria
-        for cat in ["Receita", "Custo", "Despesa", "Financeiro"]:
+        # Abas por categoria (dinâmico)
+        categorias = df_premissas["Categoria"].unique()
+        for cat in categorias:
             df_cat = df_premissas[df_premissas["Categoria"] == cat].copy()
             if not df_cat.empty:
-                df_cat.to_excel(writer, index=False, sheet_name=cat)
+                # Limitar nome da aba a 31 caracteres (limite Excel)
+                sheet_name = cat[:31]
+                df_cat.to_excel(writer, index=False, sheet_name=sheet_name)
+
+        # Aba Resumo DFC
+        df_resumo = _resumo_dfc_dataframe(resultado)
+        if not df_resumo.empty:
+            df_resumo.to_excel(writer, index=False, sheet_name="Resumo DFC")
 
     return buffer.getvalue()
 

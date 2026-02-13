@@ -612,3 +612,354 @@ CURVA_DESEMBOLSO: dict[Tipologia, list[tuple[float, float]]] = {
         (0.8, 88.0), (0.9, 95.0), (1.0, 100.0),
     ],
 }
+
+
+# ==========================================================================
+# Coordenação comercial (% do VGV)
+# Referência: Checklist Viabilidade Trinus, práticas de mercado
+# ==========================================================================
+COORDENACAO_COMERCIAL: dict[Padrao, dict] = {
+    Padrao.ECONOMICO:  {"medio": 0.5, "min": 0.3, "max": 1.0},
+    Padrao.STANDARD:   {"medio": 0.8, "min": 0.5, "max": 1.2},
+    Padrao.MEDIO:      {"medio": 1.0, "min": 0.5, "max": 1.5},
+    Padrao.MEDIO_ALTO: {"medio": 1.0, "min": 0.5, "max": 1.5},
+    Padrao.ALTO:       {"medio": 1.2, "min": 0.8, "max": 1.5},
+    Padrao.LUXO:       {"medio": 1.5, "min": 1.0, "max": 2.0},
+}
+
+
+# ==========================================================================
+# Premiação de corretores (% do VGV)
+# Referência: Checklist Viabilidade Trinus
+# ==========================================================================
+PREMIACAO_CORRETORES: dict[Padrao, dict] = {
+    Padrao.ECONOMICO:  {"medio": 0.3, "min": 0.0, "max": 0.5},
+    Padrao.STANDARD:   {"medio": 0.5, "min": 0.3, "max": 0.8},
+    Padrao.MEDIO:      {"medio": 0.5, "min": 0.3, "max": 1.0},
+    Padrao.MEDIO_ALTO: {"medio": 0.5, "min": 0.3, "max": 1.0},
+    Padrao.ALTO:       {"medio": 0.8, "min": 0.5, "max": 1.2},
+    Padrao.LUXO:       {"medio": 1.0, "min": 0.5, "max": 1.5},
+}
+
+
+# ==========================================================================
+# Custo de projetos e consultorias (% do VGV)
+# Referência: Checklist Viabilidade Trinus
+# Incorporação: ~R$10/m² de área construída ou 1% a 1.5% VGV
+# Urbanismo: 1% a 1.5% do VGV
+# ==========================================================================
+CUSTO_PROJETOS: dict[Tipologia, dict[Padrao, dict]] = {
+    Tipologia.LOTEAMENTO: {
+        Padrao.ECONOMICO:  {"medio": 1.0, "min": 0.7, "max": 1.5},
+        Padrao.STANDARD:   {"medio": 1.0, "min": 0.7, "max": 1.5},
+        Padrao.MEDIO:      {"medio": 1.2, "min": 0.8, "max": 1.5},
+        Padrao.MEDIO_ALTO: {"medio": 1.2, "min": 0.8, "max": 1.8},
+        Padrao.ALTO:       {"medio": 1.5, "min": 1.0, "max": 2.0},
+        Padrao.LUXO:       {"medio": 1.5, "min": 1.0, "max": 2.5},
+    },
+    Tipologia.INCORPORACAO_VERTICAL: {
+        Padrao.ECONOMICO:  {"medio": 1.0, "min": 0.5, "max": 1.5},
+        Padrao.STANDARD:   {"medio": 1.2, "min": 0.8, "max": 1.5},
+        Padrao.MEDIO:      {"medio": 1.2, "min": 0.8, "max": 1.8},
+        Padrao.MEDIO_ALTO: {"medio": 1.5, "min": 1.0, "max": 2.0},
+        Padrao.ALTO:       {"medio": 1.5, "min": 1.0, "max": 2.5},
+        Padrao.LUXO:       {"medio": 2.0, "min": 1.5, "max": 3.0},
+    },
+    Tipologia.INCORPORACAO_HORIZONTAL: {
+        Padrao.ECONOMICO:  {"medio": 1.0, "min": 0.5, "max": 1.5},
+        Padrao.STANDARD:   {"medio": 1.2, "min": 0.8, "max": 1.5},
+        Padrao.MEDIO:      {"medio": 1.2, "min": 0.8, "max": 1.8},
+        Padrao.MEDIO_ALTO: {"medio": 1.5, "min": 1.0, "max": 2.0},
+        Padrao.ALTO:       {"medio": 1.5, "min": 1.0, "max": 2.5},
+        Padrao.LUXO:       {"medio": 2.0, "min": 1.5, "max": 3.0},
+    },
+    Tipologia.MULTIPROPRIEDADE: {
+        Padrao.ECONOMICO:  {"medio": 1.2, "min": 0.8, "max": 1.5},
+        Padrao.STANDARD:   {"medio": 1.2, "min": 0.8, "max": 1.8},
+        Padrao.MEDIO:      {"medio": 1.5, "min": 1.0, "max": 2.0},
+        Padrao.MEDIO_ALTO: {"medio": 1.5, "min": 1.0, "max": 2.5},
+        Padrao.ALTO:       {"medio": 2.0, "min": 1.5, "max": 3.0},
+        Padrao.LUXO:       {"medio": 2.5, "min": 1.5, "max": 3.5},
+    },
+    Tipologia.MIXED_USE: {
+        Padrao.ECONOMICO:  {"medio": 1.2, "min": 0.8, "max": 1.5},
+        Padrao.STANDARD:   {"medio": 1.2, "min": 0.8, "max": 1.8},
+        Padrao.MEDIO:      {"medio": 1.5, "min": 1.0, "max": 2.0},
+        Padrao.MEDIO_ALTO: {"medio": 1.5, "min": 1.0, "max": 2.5},
+        Padrao.ALTO:       {"medio": 2.0, "min": 1.5, "max": 3.0},
+        Padrao.LUXO:       {"medio": 2.5, "min": 1.5, "max": 3.5},
+    },
+}
+
+
+# ==========================================================================
+# Custo de aprovações e licenças (% do VGV)
+# Referência: Checklist Viabilidade Trinus
+# Urbanismo: 0.5% (sem considerar contrapartidas financeiras)
+# ==========================================================================
+CUSTO_APROVACOES: dict[Tipologia, dict[Padrao, dict]] = {
+    Tipologia.LOTEAMENTO: {
+        Padrao.ECONOMICO:  {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.STANDARD:   {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO:      {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO_ALTO: {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.ALTO:       {"medio": 0.8, "min": 0.5, "max": 1.2},
+        Padrao.LUXO:       {"medio": 1.0, "min": 0.5, "max": 1.5},
+    },
+    Tipologia.INCORPORACAO_VERTICAL: {
+        Padrao.ECONOMICO:  {"medio": 0.3, "min": 0.2, "max": 0.8},
+        Padrao.STANDARD:   {"medio": 0.5, "min": 0.3, "max": 0.8},
+        Padrao.MEDIO:      {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO_ALTO: {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.ALTO:       {"medio": 0.8, "min": 0.5, "max": 1.2},
+        Padrao.LUXO:       {"medio": 1.0, "min": 0.5, "max": 1.5},
+    },
+    Tipologia.INCORPORACAO_HORIZONTAL: {
+        Padrao.ECONOMICO:  {"medio": 0.3, "min": 0.2, "max": 0.8},
+        Padrao.STANDARD:   {"medio": 0.5, "min": 0.3, "max": 0.8},
+        Padrao.MEDIO:      {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO_ALTO: {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.ALTO:       {"medio": 0.8, "min": 0.5, "max": 1.2},
+        Padrao.LUXO:       {"medio": 1.0, "min": 0.5, "max": 1.5},
+    },
+    Tipologia.MULTIPROPRIEDADE: {
+        Padrao.ECONOMICO:  {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.STANDARD:   {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO:      {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO_ALTO: {"medio": 0.8, "min": 0.5, "max": 1.2},
+        Padrao.ALTO:       {"medio": 0.8, "min": 0.5, "max": 1.5},
+        Padrao.LUXO:       {"medio": 1.0, "min": 0.5, "max": 1.5},
+    },
+    Tipologia.MIXED_USE: {
+        Padrao.ECONOMICO:  {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.STANDARD:   {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO:      {"medio": 0.5, "min": 0.3, "max": 1.0},
+        Padrao.MEDIO_ALTO: {"medio": 0.8, "min": 0.5, "max": 1.2},
+        Padrao.ALTO:       {"medio": 0.8, "min": 0.5, "max": 1.5},
+        Padrao.LUXO:       {"medio": 1.0, "min": 0.5, "max": 1.5},
+    },
+}
+
+
+# ==========================================================================
+# Curva de vendas por fase (% do total vendido)
+# Referência: Checklist Viabilidade Trinus
+# Incorporação pessimista: 20% lançamento, 60% obra, 20% pós-obra
+# Urbanismo pessimista: 30% lançamento, 50% obra, 20% pós-obra
+# ==========================================================================
+CURVA_VENDAS_FASES: dict[Tipologia, dict[str, dict]] = {
+    Tipologia.LOTEAMENTO: {
+        "pessimista":     {"lancamento": 30, "obra": 50, "pos_obra": 20},
+        "moderada":       {"lancamento": 40, "obra": 45, "pos_obra": 15},
+        "otimista":       {"lancamento": 50, "obra": 40, "pos_obra": 10},
+    },
+    Tipologia.INCORPORACAO_VERTICAL: {
+        "pessimista":     {"lancamento": 20, "obra": 60, "pos_obra": 20},
+        "moderada":       {"lancamento": 30, "obra": 55, "pos_obra": 15},
+        "otimista":       {"lancamento": 40, "obra": 50, "pos_obra": 10},
+    },
+    Tipologia.INCORPORACAO_HORIZONTAL: {
+        "pessimista":     {"lancamento": 20, "obra": 60, "pos_obra": 20},
+        "moderada":       {"lancamento": 30, "obra": 55, "pos_obra": 15},
+        "otimista":       {"lancamento": 40, "obra": 50, "pos_obra": 10},
+    },
+    Tipologia.MULTIPROPRIEDADE: {
+        "pessimista":     {"lancamento": 25, "obra": 55, "pos_obra": 20},
+        "moderada":       {"lancamento": 35, "obra": 50, "pos_obra": 15},
+        "otimista":       {"lancamento": 50, "obra": 40, "pos_obra": 10},
+    },
+    Tipologia.MIXED_USE: {
+        "pessimista":     {"lancamento": 20, "obra": 60, "pos_obra": 20},
+        "moderada":       {"lancamento": 30, "obra": 55, "pos_obra": 15},
+        "otimista":       {"lancamento": 40, "obra": 50, "pos_obra": 10},
+    },
+}
+
+
+# ==========================================================================
+# Prazo para Registro de Incorporação/Loteamento (meses)
+# Referência: Checklist Viabilidade Trinus
+# Incorporação: ~2 meses, Urbanismo: ~4 meses
+# ==========================================================================
+PRAZO_REGISTRO: dict[Tipologia, dict] = {
+    Tipologia.LOTEAMENTO:              {"medio": 4, "min": 3, "max": 6},
+    Tipologia.INCORPORACAO_VERTICAL:   {"medio": 2, "min": 1, "max": 4},
+    Tipologia.INCORPORACAO_HORIZONTAL: {"medio": 2, "min": 1, "max": 4},
+    Tipologia.MULTIPROPRIEDADE:        {"medio": 3, "min": 2, "max": 5},
+    Tipologia.MIXED_USE:               {"medio": 3, "min": 2, "max": 5},
+}
+
+
+# ==========================================================================
+# Taxa de administração de obra / BDI (% sobre custo raso)
+# Referência: Checklist Viabilidade Trinus, DFC real
+# ==========================================================================
+BDI_ADMINISTRACAO_OBRA: dict[Padrao, dict] = {
+    Padrao.ECONOMICO:  {"medio": 10.0, "min": 8.0, "max": 15.0},
+    Padrao.STANDARD:   {"medio": 12.0, "min": 8.0, "max": 15.0},
+    Padrao.MEDIO:      {"medio": 12.0, "min": 10.0, "max": 18.0},
+    Padrao.MEDIO_ALTO: {"medio": 15.0, "min": 10.0, "max": 20.0},
+    Padrao.ALTO:       {"medio": 15.0, "min": 12.0, "max": 20.0},
+    Padrao.LUXO:       {"medio": 18.0, "min": 12.0, "max": 22.0},
+}
+
+
+# ==========================================================================
+# Seguros (% do VGV)
+# Referência: Checklist Viabilidade Trinus
+# ==========================================================================
+SEGUROS: dict[Padrao, dict] = {
+    Padrao.ECONOMICO:  {"medio": 0.3, "min": 0.1, "max": 0.5},
+    Padrao.STANDARD:   {"medio": 0.3, "min": 0.2, "max": 0.5},
+    Padrao.MEDIO:      {"medio": 0.4, "min": 0.2, "max": 0.6},
+    Padrao.MEDIO_ALTO: {"medio": 0.4, "min": 0.2, "max": 0.7},
+    Padrao.ALTO:       {"medio": 0.5, "min": 0.3, "max": 0.8},
+    Padrao.LUXO:       {"medio": 0.5, "min": 0.3, "max": 1.0},
+}
+
+
+# ==========================================================================
+# Despesas pré-operacionais / Constituição SPE (% do VGV)
+# Referência: Checklist Viabilidade Trinus
+# ==========================================================================
+DESPESAS_PRE_OPERACIONAIS: dict[Padrao, dict] = {
+    Padrao.ECONOMICO:  {"medio": 0.3, "min": 0.1, "max": 0.5},
+    Padrao.STANDARD:   {"medio": 0.3, "min": 0.2, "max": 0.5},
+    Padrao.MEDIO:      {"medio": 0.4, "min": 0.2, "max": 0.6},
+    Padrao.MEDIO_ALTO: {"medio": 0.4, "min": 0.2, "max": 0.7},
+    Padrao.ALTO:       {"medio": 0.5, "min": 0.3, "max": 0.8},
+    Padrao.LUXO:       {"medio": 0.5, "min": 0.3, "max": 1.0},
+}
+
+
+# ==========================================================================
+# CRI (Certificado de Recebíveis Imobiliários)
+# Referência: Checklist Viabilidade Trinus
+# ==========================================================================
+PREMISSAS_CRI: dict[str, dict] = {
+    "taxa_cdi_spread": {
+        "medio": 5.0, "min": 4.0, "max": 6.0,
+        "unidade": "% a.a. (CDI+)",
+        "descricao": "Spread sobre CDI para CRI",
+        "fonte": "Checklist Viabilidade Trinus",
+    },
+    "taxa_ipca_spread": {
+        "medio": 14.0, "min": 13.0, "max": 15.0,
+        "unidade": "% a.a. (IPCA+)",
+        "descricao": "Spread sobre IPCA para CRI",
+        "fonte": "Checklist Viabilidade Trinus",
+    },
+    "prazo_operacao": {
+        "medio": 60, "min": 36, "max": 120,
+        "unidade": "meses",
+        "descricao": "Prazo da operação de CRI",
+        "fonte": "Práticas de mercado",
+    },
+    "custo_emissao": {
+        "medio": 2.0, "min": 1.5, "max": 3.5,
+        "unidade": "% do volume",
+        "descricao": "Custos de emissão do CRI (estruturação, rating, distribuição)",
+        "fonte": "Práticas de mercado",
+    },
+}
+
+
+# ==========================================================================
+# IPTU do terreno (% do valor do terreno por ano)
+# Referência: Checklist Viabilidade Trinus (0.5% a 1.5%)
+# ==========================================================================
+IPTU_TERRENO: dict = {
+    "medio": 1.0, "min": 0.5, "max": 1.5,
+}
+
+
+# ==========================================================================
+# Meses de recuperação de inadimplência
+# Referência: Checklist Viabilidade Trinus
+# ==========================================================================
+MESES_RECUPERACAO_INADIMPLENCIA: dict[Padrao, dict] = {
+    Padrao.ECONOMICO:  {"medio": 0, "min": 0, "max": 3},
+    Padrao.STANDARD:   {"medio": 0, "min": 0, "max": 3},
+    Padrao.MEDIO:      {"medio": 0, "min": 0, "max": 3},
+    Padrao.MEDIO_ALTO: {"medio": 0, "min": 0, "max": 3},
+    Padrao.ALTO:       {"medio": 0, "min": 0, "max": 3},
+    Padrao.LUXO:       {"medio": 0, "min": 0, "max": 3},
+}
+
+
+# ==========================================================================
+# Inadimplência por tipologia (específica para urbanismo)
+# Referência: Checklist Viabilidade Trinus (Urbanismo)
+# Loteamento aberto: 25% a 30%, Condomínio fechado: 10% a 15%
+# ==========================================================================
+INADIMPLENCIA_POR_TIPOLOGIA: dict[Tipologia, dict[Padrao, dict]] = {
+    Tipologia.LOTEAMENTO: {
+        Padrao.ECONOMICO:  {"medio": 28.0, "min": 22.0, "max": 35.0},
+        Padrao.STANDARD:   {"medio": 25.0, "min": 20.0, "max": 30.0},
+        Padrao.MEDIO:      {"medio": 20.0, "min": 15.0, "max": 28.0},
+        Padrao.MEDIO_ALTO: {"medio": 15.0, "min": 10.0, "max": 22.0},
+        Padrao.ALTO:       {"medio": 12.0, "min": 8.0,  "max": 18.0},
+        Padrao.LUXO:       {"medio": 10.0, "min": 5.0,  "max": 15.0},
+    },
+    Tipologia.INCORPORACAO_VERTICAL: {
+        Padrao.ECONOMICO:  {"medio": 8.0,  "min": 5.0,  "max": 12.0},
+        Padrao.STANDARD:   {"medio": 6.0,  "min": 4.0,  "max": 9.0},
+        Padrao.MEDIO:      {"medio": 5.0,  "min": 3.0,  "max": 7.0},
+        Padrao.MEDIO_ALTO: {"medio": 4.0,  "min": 2.0,  "max": 6.0},
+        Padrao.ALTO:       {"medio": 3.0,  "min": 1.5,  "max": 5.0},
+        Padrao.LUXO:       {"medio": 2.5,  "min": 1.0,  "max": 4.0},
+    },
+    Tipologia.INCORPORACAO_HORIZONTAL: {
+        Padrao.ECONOMICO:  {"medio": 10.0, "min": 6.0,  "max": 15.0},
+        Padrao.STANDARD:   {"medio": 8.0,  "min": 5.0,  "max": 12.0},
+        Padrao.MEDIO:      {"medio": 6.0,  "min": 4.0,  "max": 9.0},
+        Padrao.MEDIO_ALTO: {"medio": 5.0,  "min": 3.0,  "max": 7.0},
+        Padrao.ALTO:       {"medio": 4.0,  "min": 2.0,  "max": 6.0},
+        Padrao.LUXO:       {"medio": 3.0,  "min": 1.5,  "max": 5.0},
+    },
+    Tipologia.MULTIPROPRIEDADE: {
+        Padrao.ECONOMICO:  {"medio": 10.0, "min": 6.0,  "max": 15.0},
+        Padrao.STANDARD:   {"medio": 8.0,  "min": 5.0,  "max": 12.0},
+        Padrao.MEDIO:      {"medio": 6.0,  "min": 4.0,  "max": 9.0},
+        Padrao.MEDIO_ALTO: {"medio": 5.0,  "min": 3.0,  "max": 8.0},
+        Padrao.ALTO:       {"medio": 4.0,  "min": 2.0,  "max": 6.0},
+        Padrao.LUXO:       {"medio": 3.0,  "min": 1.5,  "max": 5.0},
+    },
+    Tipologia.MIXED_USE: {
+        Padrao.ECONOMICO:  {"medio": 8.0,  "min": 5.0,  "max": 12.0},
+        Padrao.STANDARD:   {"medio": 6.0,  "min": 4.0,  "max": 9.0},
+        Padrao.MEDIO:      {"medio": 5.0,  "min": 3.0,  "max": 7.0},
+        Padrao.MEDIO_ALTO: {"medio": 4.0,  "min": 2.0,  "max": 6.0},
+        Padrao.ALTO:       {"medio": 3.0,  "min": 1.5,  "max": 5.0},
+        Padrao.LUXO:       {"medio": 2.5,  "min": 1.0,  "max": 4.0},
+    },
+}
+
+
+# ==========================================================================
+# Indexadores de correção por fase
+# Referência: Checklist Viabilidade Trinus
+# Incorporação: Pré-chaves: INCC, Pós-chaves: IGP-M
+# Urbanismo: IPCA
+# ==========================================================================
+INDEXADORES_POR_TIPOLOGIA: dict[Tipologia, dict[str, str]] = {
+    Tipologia.LOTEAMENTO:              {"pre_chaves": "IPCA", "pos_chaves": "IPCA"},
+    Tipologia.INCORPORACAO_VERTICAL:   {"pre_chaves": "INCC", "pos_chaves": "IGPM"},
+    Tipologia.INCORPORACAO_HORIZONTAL: {"pre_chaves": "INCC", "pos_chaves": "IGPM"},
+    Tipologia.MULTIPROPRIEDADE:        {"pre_chaves": "INCC", "pos_chaves": "IGPM"},
+    Tipologia.MIXED_USE:               {"pre_chaves": "INCC", "pos_chaves": "IGPM"},
+}
+
+
+# ==========================================================================
+# Despesas de gestão do empreendimento / Gerenciamento (% do VGV)
+# Referência: DFC real, Checklist Viabilidade Trinus
+# ==========================================================================
+TAXA_GESTAO: dict[Padrao, dict] = {
+    Padrao.ECONOMICO:  {"medio": 1.0, "min": 0.5, "max": 1.5},
+    Padrao.STANDARD:   {"medio": 1.0, "min": 0.5, "max": 2.0},
+    Padrao.MEDIO:      {"medio": 1.5, "min": 1.0, "max": 2.5},
+    Padrao.MEDIO_ALTO: {"medio": 1.5, "min": 1.0, "max": 2.5},
+    Padrao.ALTO:       {"medio": 2.0, "min": 1.0, "max": 3.0},
+    Padrao.LUXO:       {"medio": 2.5, "min": 1.5, "max": 3.5},
+}

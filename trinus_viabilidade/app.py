@@ -583,8 +583,8 @@ elif st.session_state["etapa"] == 3:
         )
 
         # Tabs por categoria
-        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas = st.tabs(
-            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas"]
+        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas, tab_resumo_dfc = st.tabs(
+            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas", "Resumo DFC"]
         )
 
         editadas = st.session_state.get("premissas_editadas", {})
@@ -623,6 +623,78 @@ elif st.session_state["etapa"] == 3:
                 cols_tv[1].metric("Parcelas Obra", f"{tv.parcelas_obra_pct}%")
                 cols_tv[2].metric("Financiamento", f"{tv.financiamento_pct}%")
                 cols_tv[3].metric("Reforços", f"{tv.reforcos_pct}%")
+
+        # --- Resumo DFC ---
+        with tab_resumo_dfc:
+            st.subheader("Resumo do Fluxo de Caixa Projetado")
+            st.markdown(
+                "Visão consolidada das premissas, mapeadas para as categorias "
+                "do DFC (Demonstração de Fluxo de Caixa) padrão Trinus."
+            )
+
+            vgv_p = resultado.get_premissa("VGV estimado")
+            vgv_val = vgv_p.valor if vgv_p else 0
+
+            # Receita
+            with st.expander("**RECEITA**", expanded=True):
+                st.markdown("##### Composição da Receita")
+                receita_items = resultado.por_categoria("Receita")
+                for p in receita_items:
+                    if p.unidade == "R$":
+                        st.markdown(f"- **{p.nome}:** R$ {p.valor:,.2f}")
+                    elif p.unidade in ("% estoque/mês", "%", "% do total"):
+                        st.markdown(f"- **{p.nome}:** {p.valor:.1f}{p.unidade}")
+                    elif p.unidade in ("INCC", "IPCA", "IGPM", "meses"):
+                        st.markdown(f"- **{p.nome}:** {p.descricao}")
+                    else:
+                        st.markdown(f"- **{p.nome}:** {p.valor:.2f} {p.unidade}")
+
+            # Custos
+            with st.expander("**CUSTOS**", expanded=True):
+                st.markdown("##### Composição dos Custos")
+                custo_items = resultado.por_categoria("Custo")
+                for p in custo_items:
+                    if p.unidade == "R$":
+                        st.markdown(f"- **{p.nome}:** R$ {p.valor:,.2f}")
+                    elif "% do VGV" in p.unidade and vgv_val > 0:
+                        valor_abs = vgv_val * p.valor / 100
+                        st.markdown(
+                            f"- **{p.nome}:** {p.valor:.1f}% do VGV "
+                            f"(~R$ {valor_abs:,.0f})"
+                        )
+                    else:
+                        st.markdown(f"- **{p.nome}:** {p.valor:.2f} {p.unidade}")
+
+            # Despesas
+            with st.expander("**DESPESAS**", expanded=True):
+                st.markdown("##### Composição das Despesas")
+                despesa_items = resultado.por_categoria("Despesa")
+                total_desp_pct = 0
+                for p in despesa_items:
+                    if "% do VGV" in p.unidade or "% sobre receita" in p.unidade:
+                        total_desp_pct += p.valor
+                        if vgv_val > 0:
+                            valor_abs = vgv_val * p.valor / 100
+                            st.markdown(
+                                f"- **{p.nome}:** {p.valor:.1f}% "
+                                f"(~R$ {valor_abs:,.0f})"
+                            )
+                        else:
+                            st.markdown(f"- **{p.nome}:** {p.valor:.1f}%")
+                    else:
+                        st.markdown(f"- **{p.nome}:** {p.valor:.2f} {p.unidade}")
+                if vgv_val > 0:
+                    st.markdown(
+                        f"**Total despesas estimadas:** {total_desp_pct:.1f}% do VGV "
+                        f"(~R$ {vgv_val * total_desp_pct / 100:,.0f})"
+                    )
+
+            # Financeiro
+            with st.expander("**FINANCEIRO**", expanded=True):
+                st.markdown("##### Premissas Financeiras e CRI")
+                fin_items = resultado.por_categoria("Financeiro")
+                for p in fin_items:
+                    st.markdown(f"- **{p.nome}:** {p.valor:.2f} {p.unidade}")
 
         st.markdown("---")
 

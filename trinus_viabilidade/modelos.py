@@ -125,6 +125,14 @@ class Premissa:
 
 
 @dataclass
+class CurvaVendas:
+    """Distribuição das vendas por fase do empreendimento."""
+    lancamento_pct: float  # % vendidas no lançamento
+    obra_pct: float  # % vendidas durante obra
+    pos_obra_pct: float  # % vendidas pós-obra
+
+
+@dataclass
 class TabelaVendas:
     """Estrutura da tabela de vendas (condições de pagamento)."""
     entrada_pct: float  # % do valor na entrada
@@ -194,6 +202,6 @@ class ResultadoPremissas:
                     }
                     for p in self.por_categoria(cat)
                 ]
-                for cat in ["Receita", "Custo", "Despesa", "Financeiro"]
+                for cat in sorted({p.categoria for p in self.premissas})
             },
         }
