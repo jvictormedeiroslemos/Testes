@@ -186,6 +186,13 @@ if st.session_state["etapa"] == 1:
             if not cidade.strip():
                 st.error("Preencha o campo Cidade.")
             else:
+                # Salvar valores da Etapa 1 em chaves persistentes
+                st.session_state["data_tipologia"] = st.session_state["inp_tipologia"]
+                st.session_state["data_padrao"] = st.session_state["inp_padrao"]
+                st.session_state["data_num_unidades"] = st.session_state["inp_num_unidades"]
+                st.session_state["data_estado"] = st.session_state["inp_estado"]
+                st.session_state["data_cidade"] = st.session_state["inp_cidade"]
+                st.session_state["data_tipo_negociacao"] = st.session_state["inp_tipo_negociacao"]
                 ir_para_etapa(2)
                 st.rerun()
 
@@ -251,17 +258,17 @@ elif st.session_state["etapa"] == 2:
             type="primary",
             use_container_width=True,
         ):
-            # Montar InputsUsuario
-            tipologia_enum = Tipologia(st.session_state["inp_tipologia"])
-            padrao_enum = Padrao(st.session_state["inp_padrao"])
-            negociacao_enum = TipoNegociacao(st.session_state["inp_tipo_negociacao"])
+            # Montar InputsUsuario (usa chaves persistentes salvas na Etapa 1)
+            tipologia_enum = Tipologia(st.session_state["data_tipologia"])
+            padrao_enum = Padrao(st.session_state["data_padrao"])
+            negociacao_enum = TipoNegociacao(st.session_state["data_tipo_negociacao"])
 
             inputs = InputsUsuario(
                 tipologia=tipologia_enum,
-                estado=st.session_state["inp_estado"],
-                cidade=st.session_state["inp_cidade"],
+                estado=st.session_state["data_estado"],
+                cidade=st.session_state["data_cidade"],
                 padrao=padrao_enum,
-                num_unidades=st.session_state["inp_num_unidades"],
+                num_unidades=st.session_state["data_num_unidades"],
                 tipo_negociacao=negociacao_enum,
                 area_terreno_m2=area_terreno if area_terreno > 0 else None,
                 vgv_estimado=vgv_estimado if vgv_estimado > 0 else None,
