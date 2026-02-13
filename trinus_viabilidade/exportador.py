@@ -60,6 +60,13 @@ def _inputs_para_dataframe(resultado: ResultadoPremissas) -> pd.DataFrame:
         {"Campo": "VGV Estimado (R$)", "Valor": inp.vgv_estimado or "Calculado pelo sistema"},
         {"Campo": "Área Privativa Média (m²)", "Valor": inp.area_privativa_media_m2 or "Estimado pelo sistema"},
     ]
+    # Parâmetros de negociação
+    if inp.permuta_percentual is not None:
+        rows.append({"Campo": "Permuta (%)", "Valor": inp.permuta_percentual})
+    if inp.permuta_referencia:
+        rows.append({"Campo": "Referência da Permuta", "Valor": inp.permuta_referencia})
+    if inp.valor_aquisicao is not None:
+        rows.append({"Campo": "Valor da Aquisição (R$)", "Valor": inp.valor_aquisicao})
     return pd.DataFrame(rows)
 
 

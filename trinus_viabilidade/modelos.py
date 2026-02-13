@@ -99,6 +99,10 @@ class InputsUsuario:
     area_terreno_m2: Optional[float] = None
     vgv_estimado: Optional[float] = None
     area_privativa_media_m2: Optional[float] = None
+    # Parâmetros de negociação do terreno
+    permuta_percentual: Optional[float] = None
+    permuta_referencia: Optional[str] = None  # "VGV" ou "Receita"
+    valor_aquisicao: Optional[float] = None
 
     @property
     def regiao(self) -> Regiao:
@@ -165,6 +169,9 @@ class ResultadoPremissas:
                 "area_terreno_m2": self.inputs.area_terreno_m2,
                 "vgv_estimado": self.inputs.vgv_estimado,
                 "area_privativa_media_m2": self.inputs.area_privativa_media_m2,
+                "permuta_percentual": self.inputs.permuta_percentual,
+                "permuta_referencia": self.inputs.permuta_referencia,
+                "valor_aquisicao": self.inputs.valor_aquisicao,
             },
             "tabela_vendas": {
                 "entrada_pct": self.tabela_vendas.entrada_pct,

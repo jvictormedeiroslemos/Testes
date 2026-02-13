@@ -24,6 +24,7 @@ from modelos import (
     TipoNegociacao,
 )
 from engine import gerar_premissas
+from engine_ia import gerar_premissas_com_ia
 from exportador import (
     exportar_excel_bytes,
     exportar_json_bytes,
@@ -31,6 +32,7 @@ from exportador import (
     premissas_para_dataframe,
     tabela_vendas_para_dataframe,
 )
+from cidades import CIDADES_POR_ESTADO
 
 # ---------------------------------------------------------------------------
 # Configuração da página
@@ -71,6 +73,8 @@ if "resultado" not in st.session_state:
     st.session_state["resultado"] = None
 if "premissas_editadas" not in st.session_state:
     st.session_state["premissas_editadas"] = {}
+if "ia_metadata" not in st.session_state:
+    st.session_state["ia_metadata"] = None
 
 
 def ir_para_etapa(n: int):
@@ -102,15 +106,32 @@ with st.sidebar:
             st.markdown(f"{nome}")
 
     st.markdown("---")
-    st.markdown(
-        "**Fase 1 - MVP**\n\n"
-        "Premissas baseadas em benchmarks\n"
-        "de mercado (dados estáticos)."
+
+    # -----------------------------------------------------------------------
+    # Integração com IA
+    # -----------------------------------------------------------------------
+    st.subheader("Integração com IA")
+    api_key = st.text_input(
+        "OpenAI API Key",
+        type="password",
+        key="openai_api_key",
+        help="Insira sua chave da API OpenAI para usar IA na sugestão de premissas. "
+             "Obtenha em platform.openai.com",
     )
+    if api_key:
+        st.success("API Key configurada — IA ativada")
+    else:
+        st.info(
+            "Sem API Key: premissas baseadas apenas em benchmarks estáticos de mercado."
+        )
+
     st.markdown("---")
     if st.button("Recomeçar", use_container_width=True):
+        api_key_backup = st.session_state.get("openai_api_key", "")
         for key in list(st.session_state.keys()):
             del st.session_state[key]
+        if api_key_backup:
+            st.session_state["openai_api_key"] = api_key_backup
         st.rerun()
 
 # ---------------------------------------------------------------------------
@@ -164,12 +185,27 @@ if st.session_state["etapa"] == 1:
             help="Estado do empreendimento (define a região para benchmarks)",
         )
 
-        cidade = st.text_input(
+        # Lista de cidades filtrada pelo estado selecionado
+        cidades_estado = CIDADES_POR_ESTADO.get(estado, [])
+        opcoes_cidade = cidades_estado + ["Outra (digitar)"]
+
+        cidade_selecionada = st.selectbox(
             "Cidade *",
-            value="",
-            key="inp_cidade",
-            help="Cidade onde o empreendimento será implantado",
+            options=opcoes_cidade,
+            key="inp_cidade_select",
+            help="Comece a digitar para filtrar as cidades. Selecione 'Outra' se não encontrar.",
         )
+
+        # Se "Outra" foi selecionada, mostrar campo de texto
+        if cidade_selecionada == "Outra (digitar)":
+            cidade_custom = st.text_input(
+                "Digite o nome da cidade *",
+                key="inp_cidade_custom",
+                help="Informe o nome da cidade",
+            )
+            cidade_final = cidade_custom.strip()
+        else:
+            cidade_final = cidade_selecionada
 
         tipo_negociacao = st.selectbox(
             "Tipo de negociação do terreno *",
@@ -178,12 +214,72 @@ if st.session_state["etapa"] == 1:
             help="Forma de aquisição/negociação do terreno",
         )
 
+    # -------------------------------------------------------------------
+    # Campos dinâmicos baseados no tipo de negociação
+    # -------------------------------------------------------------------
+    st.markdown("##### Parâmetros da Negociação")
+
+    if tipo_negociacao == TipoNegociacao.PERMUTA_FISICA.value:
+        st.info("**Permuta Física:** O proprietário recebe unidades do empreendimento.")
+        permuta_pct = st.number_input(
+            "Percentual de permuta (%)",
+            min_value=0.0,
+            max_value=100.0,
+            value=15.0,
+            step=0.5,
+            key="inp_permuta_pct",
+            help="Percentual das unidades que será destinado ao proprietário do terreno",
+        )
+
+    elif tipo_negociacao in [
+        TipoNegociacao.PERMUTA_FINANCEIRA.value,
+        TipoNegociacao.PERMUTA_RESULTADO.value,
+    ]:
+        label_tipo = (
+            "Permuta Financeira" if tipo_negociacao == TipoNegociacao.PERMUTA_FINANCEIRA.value
+            else "Permuta por Resultado"
+        )
+        st.info(
+            f"**{label_tipo}:** O proprietário recebe um percentual "
+            f"{'do valor financeiro' if 'Financeira' in label_tipo else 'do resultado'}."
+        )
+        col_perm1, col_perm2 = st.columns(2)
+        with col_perm1:
+            permuta_pct = st.number_input(
+                "Percentual de permuta (%)",
+                min_value=0.0,
+                max_value=100.0,
+                value=15.0,
+                step=0.5,
+                key="inp_permuta_pct",
+                help="Percentual que será destinado ao proprietário do terreno",
+            )
+        with col_perm2:
+            permuta_ref = st.selectbox(
+                "Referência do percentual",
+                options=["VGV", "Receita"],
+                key="inp_permuta_ref",
+                help="Se o percentual será calculado sobre o VGV ou sobre a Receita do empreendimento",
+            )
+
+    elif tipo_negociacao == TipoNegociacao.AQUISICAO.value:
+        st.info("**Aquisição:** Compra direta do terreno por valor financeiro.")
+        valor_aquisicao = st.number_input(
+            "Valor da aquisição do terreno (R$)",
+            min_value=0.0,
+            value=0.0,
+            step=100_000.0,
+            key="inp_valor_aquisicao",
+            format="%.2f",
+            help="Valor total para aquisição do terreno",
+        )
+
     st.markdown("---")
 
     col_btn1, col_btn2, _ = st.columns([1, 1, 2])
     with col_btn2:
         if st.button("Próximo →", key="btn_etapa1_next", type="primary", use_container_width=True):
-            if not cidade.strip():
+            if not cidade_final:
                 st.error("Preencha o campo Cidade.")
             else:
                 # Salvar valores da Etapa 1 em chaves persistentes
@@ -191,8 +287,28 @@ if st.session_state["etapa"] == 1:
                 st.session_state["data_padrao"] = st.session_state["inp_padrao"]
                 st.session_state["data_num_unidades"] = st.session_state["inp_num_unidades"]
                 st.session_state["data_estado"] = st.session_state["inp_estado"]
-                st.session_state["data_cidade"] = st.session_state["inp_cidade"]
+                st.session_state["data_cidade"] = cidade_final
                 st.session_state["data_tipo_negociacao"] = st.session_state["inp_tipo_negociacao"]
+
+                # Salvar parâmetros de negociação
+                tipo_neg = st.session_state["inp_tipo_negociacao"]
+                if tipo_neg == TipoNegociacao.PERMUTA_FISICA.value:
+                    st.session_state["data_permuta_pct"] = st.session_state.get("inp_permuta_pct", 15.0)
+                    st.session_state["data_permuta_ref"] = None
+                    st.session_state["data_valor_aquisicao"] = None
+                elif tipo_neg in [
+                    TipoNegociacao.PERMUTA_FINANCEIRA.value,
+                    TipoNegociacao.PERMUTA_RESULTADO.value,
+                ]:
+                    st.session_state["data_permuta_pct"] = st.session_state.get("inp_permuta_pct", 15.0)
+                    st.session_state["data_permuta_ref"] = st.session_state.get("inp_permuta_ref", "VGV")
+                    st.session_state["data_valor_aquisicao"] = None
+                elif tipo_neg == TipoNegociacao.AQUISICAO.value:
+                    st.session_state["data_permuta_pct"] = None
+                    st.session_state["data_permuta_ref"] = None
+                    val_aq = st.session_state.get("inp_valor_aquisicao", 0.0)
+                    st.session_state["data_valor_aquisicao"] = val_aq if val_aq > 0 else None
+
                 ir_para_etapa(2)
                 st.rerun()
 
@@ -244,6 +360,14 @@ elif st.session_state["etapa"] == 2:
         "funciona mesmo com apenas os dados obrigatórios da Etapa 1."
     )
 
+    # Indicação se IA está ativa
+    api_key = st.session_state.get("openai_api_key", "")
+    if api_key:
+        st.success(
+            "A IA está ativada e será usada para refinar as premissas "
+            "com base no mercado local da cidade selecionada."
+        )
+
     st.markdown("---")
 
     col_btn1, col_btn2, _ = st.columns([1, 1, 2])
@@ -273,10 +397,26 @@ elif st.session_state["etapa"] == 2:
                 area_terreno_m2=area_terreno if area_terreno > 0 else None,
                 vgv_estimado=vgv_estimado if vgv_estimado > 0 else None,
                 area_privativa_media_m2=area_privativa if area_privativa > 0 else None,
+                permuta_percentual=st.session_state.get("data_permuta_pct"),
+                permuta_referencia=st.session_state.get("data_permuta_ref"),
+                valor_aquisicao=st.session_state.get("data_valor_aquisicao"),
             )
 
-            resultado = gerar_premissas(inputs)
+            # Gerar premissas estáticas (base)
+            with st.spinner("Gerando premissas com base nos benchmarks de mercado..."):
+                resultado = gerar_premissas(inputs)
+
+            # Enriquecer com IA se API Key disponível
+            ia_metadata = None
+            api_key = st.session_state.get("openai_api_key", "")
+            if api_key:
+                with st.spinner("Refinando premissas com IA... Isso pode levar alguns segundos."):
+                    resultado, ia_metadata = gerar_premissas_com_ia(
+                        inputs, resultado, api_key,
+                    )
+
             st.session_state["resultado"] = resultado
+            st.session_state["ia_metadata"] = ia_metadata
             st.session_state["premissas_editadas"] = {}
             ir_para_etapa(3)
             st.rerun()
@@ -295,6 +435,25 @@ elif st.session_state["etapa"] == 3:
             st.rerun()
     else:
         inputs = resultado.inputs
+
+        # Mostrar insights da IA se disponíveis
+        ia_metadata = st.session_state.get("ia_metadata")
+        if ia_metadata and "erro" not in ia_metadata:
+            with st.expander(
+                f"Insights da IA ({ia_metadata.get('ajustes_aplicados', 0)} "
+                f"premissas ajustadas)",
+                expanded=True,
+            ):
+                if ia_metadata.get("insights"):
+                    st.markdown("**Insights do mercado:**")
+                    for insight in ia_metadata["insights"]:
+                        st.markdown(f"- {insight}")
+                if ia_metadata.get("recomendacoes"):
+                    st.markdown("**Recomendações:**")
+                    for rec in ia_metadata["recomendacoes"]:
+                        st.markdown(f"- {rec}")
+        elif ia_metadata and "erro" in ia_metadata:
+            st.warning(f"IA indisponível: {ia_metadata['erro']}")
 
         # Resumo dos inputs
         with st.expander("Resumo do empreendimento", expanded=False):
@@ -457,8 +616,11 @@ elif st.session_state["etapa"] == 4:
                 st.rerun()
         with col_btn2:
             if st.button("Nova Viabilidade", key="btn_etapa4_new", use_container_width=True):
+                api_key_backup = st.session_state.get("openai_api_key", "")
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
+                if api_key_backup:
+                    st.session_state["openai_api_key"] = api_key_backup
                 st.rerun()
 
 
