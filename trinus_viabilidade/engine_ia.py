@@ -9,6 +9,7 @@ imobiliário local.
 from __future__ import annotations
 
 import json
+import re
 
 from modelos import InputsUsuario, ResultadoPremissas
 
@@ -141,7 +142,18 @@ def gerar_premissas_com_ia(
             max_tokens=4000,
         )
 
-        resultado_ia = json.loads(response.content[0].text)
+        raw_text = response.content[0].text.strip()
+        # Extrair JSON se a resposta vier embrulhada em bloco markdown
+        md_match = re.search(r"```(?:json)?\s*(\{.*\})\s*```", raw_text, re.DOTALL)
+        if md_match:
+            raw_text = md_match.group(1)
+        elif not raw_text.startswith("{"):
+            # Tentar encontrar o primeiro '{' ... último '}'
+            start = raw_text.find("{")
+            end = raw_text.rfind("}")
+            if start != -1 and end != -1:
+                raw_text = raw_text[start : end + 1]
+        resultado_ia = json.loads(raw_text)
 
         ajustes = resultado_ia.get("premissas_ajustadas", {})
         ajustes_aplicados = 0
