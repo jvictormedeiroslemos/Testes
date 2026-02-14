@@ -934,75 +934,105 @@ elif st.session_state["etapa"] == 3:
                     f"R$ {sim.receita_liquida:,.0f}".replace(",", "."),
                 )
 
-                # === DRE Resumido ===
+                # === FLUXO DE CAIXA (estrutura DFC Trinus) ===
                 st.markdown("---")
-                st.markdown("### DRE Simplificado do Projeto")
+                st.markdown("### Fluxo de Caixa do Projeto")
 
-                dre_data = {
-                    "Linha": [
-                        "VGV (Valor Geral de Vendas)",
-                        "(-) Distrato / Inadimplência",
-                        "= Receita Líquida",
-                        "",
-                        "(-) Custo do Terreno",
-                        f"(-) Custo de {'Infraestrutura' if resultado.e_loteamento else 'Construção'}",
-                        "(-) BDI / Administração de Obra",
-                        "(-) Projetos e Aprovações",
-                        "(-) Outros Custos (IPTU, ITBI)",
-                        "= Total de Custos",
-                        "",
-                        "(-) Despesas Comerciais",
-                        "(-) Despesas Administrativas",
-                        "(-) Despesas Tributárias",
-                        "(-) Despesas Cartoriais",
-                        "= Total de Despesas",
-                        "",
-                        "= RESULTADO DO PROJETO",
-                    ],
-                    "Valor (R$)": [
-                        f"R$ {sim.vgv:,.0f}",
-                        f"R$ {(sim.vgv - sim.receita_liquida):,.0f}",
-                        f"R$ {sim.receita_liquida:,.0f}",
-                        "",
-                        f"R$ {sim.custo_terreno:,.0f}",
-                        f"R$ {sim.custo_construcao_infra:,.0f}",
-                        f"R$ {sim.custo_bdi:,.0f}",
-                        f"R$ {sim.custo_projetos_aprovacoes:,.0f}",
-                        f"R$ {sim.custo_outros:,.0f}",
-                        f"R$ {sim.custo_total:,.0f}",
-                        "",
-                        f"R$ {sim.despesa_comercial:,.0f}",
-                        f"R$ {sim.despesa_administrativa:,.0f}",
-                        f"R$ {sim.despesa_tributaria:,.0f}",
-                        f"R$ {sim.despesa_cartorial:,.0f}",
-                        f"R$ {sim.despesa_total:,.0f}",
-                        "",
-                        f"R$ {sim.resultado_projeto:,.0f}",
-                    ],
-                    "% VGV": [
-                        "100,0%",
-                        f"{(sim.vgv - sim.receita_liquida) / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.receita_liquida / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        "",
-                        f"{sim.custo_terreno / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.custo_construcao_infra / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.custo_bdi / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.custo_projetos_aprovacoes / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.custo_outros / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.custo_total / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        "",
-                        f"{sim.despesa_comercial / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.despesa_administrativa / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.despesa_tributaria / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.despesa_cartorial / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        f"{sim.despesa_total / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
-                        "",
-                        f"{sim.margem_vgv:.1f}%",
-                    ],
-                }
+                def _fmt(v: float) -> str:
+                    """Formata valor monetário."""
+                    if v == 0:
+                        return "-"
+                    return f"R$ {v:,.0f}"
 
-                df_dre = pd.DataFrame(dre_data)
-                st.dataframe(df_dre, use_container_width=True, hide_index=True, height=680)
+                def _pct(v: float, base: float) -> str:
+                    """Calcula e formata percentual."""
+                    if base == 0:
+                        return "-"
+                    return f"{v / base * 100:.1f}%"
+
+                rl = sim.receita_liquida  # base para margem nominal
+                v = sim.vgv
+
+                e_lot = resultado.e_loteamento
+                lbl_obra = "infraestrutura" if e_lot else "construção"
+                lbl_inter = "Intermediárias / Saldo parcelado" if e_lot else "Financiamento / Reforços"
+
+                # Montar linhas do DFC hierarquicamente
+                # Cada linha: (indent, label, nominal, margem_nominal, pct_vgv)
+                linhas = [
+                    # --- VENDAS ---
+                    (0, "VENDAS", "", "", ""),
+                    (1, "VGV (Valor Geral de Vendas)", _fmt(v), "", "100,0%"),
+                    (1, f"Unidades líquidas (após distrato)", f"{sim.num_unidades_liquidas:.0f} un.", "", ""),
+                    (1, "(-) VGV cancelado (distratos)", _fmt(-sim.vgv_cancelado), "", _pct(-sim.vgv_cancelado, v)),
+                    (1, "VGV Líquido", _fmt(v - sim.vgv_cancelado), "", _pct(v - sim.vgv_cancelado, v)),
+                    (0, "", "", "", ""),
+                    # --- RECEITA ---
+                    (0, "RECEITA LÍQUIDA OPERACIONAL", _fmt(rl), "100,0%", _pct(rl, v)),
+                    (1, "Receita Bruta Operacional", _fmt(sim.receita_bruta), _pct(sim.receita_bruta, rl), _pct(sim.receita_bruta, v)),
+                    (2, "Entrada / Sinal", _fmt(sim.receita_entrada), _pct(sim.receita_entrada, rl), _pct(sim.receita_entrada, v)),
+                    (2, "Parcelas mensais", _fmt(sim.receita_parcelas), _pct(sim.receita_parcelas, rl), _pct(sim.receita_parcelas, v)),
+                    (2, lbl_inter, _fmt(sim.receita_intermediarias), _pct(sim.receita_intermediarias, rl), _pct(sim.receita_intermediarias, v)),
+                    (1, "(-) Inadimplência", _fmt(-sim.valor_inadimplencia), _pct(-sim.valor_inadimplencia, rl), _pct(-sim.valor_inadimplencia, v)),
+                    (0, "", "", "", ""),
+                    # --- DEDUTORES ---
+                    (0, "(-) DEDUTORES DE RECEITA", _fmt(-sim.impostos_total), _pct(-sim.impostos_total, rl), _pct(-sim.impostos_total, v)),
+                    (1, "Impostos sobre receita", _fmt(-sim.impostos_total), _pct(-sim.impostos_total, rl), _pct(-sim.impostos_total, v)),
+                    (0, "", "", "", ""),
+                    # --- CUSTOS ---
+                    (0, "(-) CUSTOS", _fmt(-sim.custo_total), _pct(-sim.custo_total, rl), _pct(-sim.custo_total, v)),
+                    (1, f"Custo total de obra ({lbl_obra})", _fmt(-sim.custo_obra_total), _pct(-sim.custo_obra_total, rl), _pct(-sim.custo_obra_total, v)),
+                    (2, f"Custo raso de {lbl_obra}", _fmt(-sim.custo_obra_raso), _pct(-sim.custo_obra_raso, rl), _pct(-sim.custo_obra_raso, v)),
+                    (2, "Custo de administração de obra (BDI)", _fmt(-sim.custo_admin_obra), _pct(-sim.custo_admin_obra, rl), _pct(-sim.custo_admin_obra, v)),
+                    (2, "Custo de projetos e consultorias", _fmt(-sim.custo_projetos), _pct(-sim.custo_projetos, rl), _pct(-sim.custo_projetos, v)),
+                    (2, "Custo de aprovações e licenças", _fmt(-sim.custo_aprovacoes), _pct(-sim.custo_aprovacoes, rl), _pct(-sim.custo_aprovacoes, v)),
+                    (1, "Custo de terreno", _fmt(-sim.custo_terreno_total), _pct(-sim.custo_terreno_total, rl), _pct(-sim.custo_terreno_total, v)),
+                    (2, "Custo de aquisição do terreno", _fmt(-sim.custo_terreno_aquisicao), _pct(-sim.custo_terreno_aquisicao, rl), _pct(-sim.custo_terreno_aquisicao, v)),
+                    (2, "Custo de ITBI", _fmt(-sim.custo_itbi), _pct(-sim.custo_itbi, rl), _pct(-sim.custo_itbi, v)),
+                    (2, "Custo de IPTU do terreno", _fmt(-sim.custo_iptu), _pct(-sim.custo_iptu, rl), _pct(-sim.custo_iptu, v)),
+                    (0, "", "", "", ""),
+                    # --- DESPESAS ---
+                    (0, "(-) DESPESAS", _fmt(-sim.despesa_total), _pct(-sim.despesa_total, rl), _pct(-sim.despesa_total, v)),
+                    (1, "Despesas comerciais", _fmt(-(sim.despesa_comercial)), _pct(-(sim.despesa_comercial), rl), _pct(-(sim.despesa_comercial), v)),
+                    (2, "Comissões (corretagem)", _fmt(-sim.desp_comissoes), _pct(-sim.desp_comissoes, rl), _pct(-sim.desp_comissoes, v)),
+                    (2, "Premiação de corretores", _fmt(-sim.desp_premiacao), _pct(-sim.desp_premiacao, rl), _pct(-sim.desp_premiacao, v)),
+                    (2, "Central de vendas / Stand", _fmt(-sim.desp_stand), _pct(-sim.desp_stand, rl), _pct(-sim.desp_stand, v)),
+                    (2, "Coordenação comercial", _fmt(-sim.desp_coordenacao), _pct(-sim.desp_coordenacao, rl), _pct(-sim.desp_coordenacao, v)),
+                    (1, "Despesas de marketing", _fmt(-sim.desp_marketing), _pct(-sim.desp_marketing, rl), _pct(-sim.desp_marketing, v)),
+                    (1, "Despesas administrativas", _fmt(-sim.despesa_administrativa), _pct(-sim.despesa_administrativa, rl), _pct(-sim.despesa_administrativa, v)),
+                    (2, "Gerenciamento / Taxa de gestão", _fmt(-sim.desp_gestao), _pct(-sim.desp_gestao, rl), _pct(-sim.desp_gestao, v)),
+                    (2, "Despesas administrativas SPE", _fmt(-sim.desp_admin), _pct(-sim.desp_admin, rl), _pct(-sim.desp_admin, v)),
+                    (2, "Seguros", _fmt(-sim.desp_seguros), _pct(-sim.desp_seguros, rl), _pct(-sim.desp_seguros, v)),
+                    (2, "Despesas pré-operacionais", _fmt(-sim.desp_preop), _pct(-sim.desp_preop, rl), _pct(-sim.desp_preop, v)),
+                    (1, "Despesas cartoriais", _fmt(-sim.despesa_cartorial), _pct(-sim.despesa_cartorial, rl), _pct(-sim.despesa_cartorial, v)),
+                    (2, "Registro de incorporação / loteamento", _fmt(-sim.desp_ri), _pct(-sim.desp_ri, rl), _pct(-sim.desp_ri, v)),
+                    (2, "Escrituras e registros", _fmt(-sim.desp_escrituras), _pct(-sim.desp_escrituras, rl), _pct(-sim.desp_escrituras, v)),
+                    (1, "Impostos sobre receita", _fmt(-sim.despesa_tributaria), _pct(-sim.despesa_tributaria, rl), _pct(-sim.despesa_tributaria, v)),
+                    (0, "", "", "", ""),
+                    # --- RESULTADO OPERACIONAL ---
+                    (0, "(=) ATIVIDADES OPERACIONAIS", _fmt(sim.resultado_projeto), _pct(sim.resultado_projeto, rl), _pct(sim.resultado_projeto, v)),
+                    (0, "", "", "", ""),
+                    # --- RESULTADO FINAL ---
+                    (0, "(=) RESULTADO DO PROJETO", _fmt(sim.resultado_projeto), _pct(sim.resultado_projeto, rl), f"{sim.margem_vgv:.1f}%"),
+                    (0, "", "", "", ""),
+                    # --- SALDO ---
+                    (0, "SALDO ACUMULADO FINAL", _fmt(sim.fluxo_acumulado[-1] if sim.fluxo_acumulado else 0), "", ""),
+                    (0, "EXPOSIÇÃO MÁXIMA DE CAIXA", _fmt(sim.exposicao_maxima), "", _pct(abs(sim.exposicao_maxima), v)),
+                ]
+
+                # Construir DataFrame com indentação visual
+                df_linhas = []
+                for indent, label, nominal, margem, pct_vgv in linhas:
+                    prefix = "    " * indent
+                    df_linhas.append({
+                        "Linha": f"{prefix}{label}",
+                        "Nominal (R$)": nominal,
+                        "Margem Nominal": margem,
+                        "% VGV": pct_vgv,
+                    })
+
+                df_dfc = pd.DataFrame(df_linhas)
+                st.dataframe(df_dfc, use_container_width=True, hide_index=True, height=1200)
 
                 # === Gráfico de Fluxo de Caixa ===
                 st.markdown("---")

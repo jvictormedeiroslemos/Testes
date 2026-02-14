@@ -19,36 +19,103 @@ from dados_mercado import CURVA_DESEMBOLSO
 # ---------------------------------------------------------------------------
 @dataclass
 class ResultadoSimulacao:
-    """Indicadores financeiros e fluxo de caixa projetado."""
+    """Indicadores financeiros e fluxo de caixa projetado (estrutura DFC Trinus)."""
 
-    # === Totais ===
+    # === VENDAS ===
     vgv: float = 0.0
-    receita_liquida: float = 0.0
+    num_unidades_liquidas: float = 0.0   # Após distrato
+    vgv_cancelado: float = 0.0           # VGV perdido por distrato
+
+    # === RECEITA ===
+    receita_bruta: float = 0.0           # Antes de inadimplência
+    receita_liquida: float = 0.0         # Receita Líquida Operacional
+    receita_entrada: float = 0.0         # Entrada / Sinal
+    receita_parcelas: float = 0.0        # Mensais + Parcelas obra
+    receita_intermediarias: float = 0.0  # Intermediárias / Reforços / Financiamento
+    valor_inadimplencia: float = 0.0     # Perda por inadimplência
+    valor_distrato: float = 0.0          # Perda por distratos na receita
+
+    # === DEDUTORES DE RECEITA ===
+    impostos_total: float = 0.0          # Imposto sobre receita (RET / LP)
+
+    # === CUSTOS ===
     custo_total: float = 0.0
+
+    # -- Custo de Obra --
+    custo_obra_total: float = 0.0        # Subtotal obra
+    custo_obra_raso: float = 0.0         # Custo raso de obra (construção/infra)
+    custo_admin_obra: float = 0.0        # Administração de obra (BDI)
+    custo_projetos: float = 0.0          # Projetos e consultorias
+    custo_aprovacoes: float = 0.0        # Aprovações e licenças
+
+    # -- Custo de Terreno --
+    custo_terreno_total: float = 0.0     # Subtotal terreno
+    custo_terreno_aquisicao: float = 0.0 # Aquisição do terreno
+    custo_itbi: float = 0.0              # ITBI sobre aquisição do terreno
+    custo_iptu: float = 0.0              # IPTU do terreno
+
+    # Aliases mantidos para retrocompat com diagnóstico
+    @property
+    def custo_terreno(self) -> float:
+        return self.custo_terreno_aquisicao
+
+    @property
+    def custo_construcao_infra(self) -> float:
+        return self.custo_obra_raso
+
+    @property
+    def custo_bdi(self) -> float:
+        return self.custo_admin_obra
+
+    @property
+    def custo_projetos_aprovacoes(self) -> float:
+        return self.custo_projetos + self.custo_aprovacoes
+
+    @property
+    def custo_outros(self) -> float:
+        return self.custo_itbi + self.custo_iptu
+
+    # === DESPESAS ===
     despesa_total: float = 0.0
-    resultado_projeto: float = 0.0
 
-    # === Detalhamento de custos ===
-    custo_terreno: float = 0.0
-    custo_construcao_infra: float = 0.0
-    custo_projetos_aprovacoes: float = 0.0
-    custo_bdi: float = 0.0
-    custo_outros: float = 0.0
+    # -- Despesas Comerciais --
+    despesa_comercial: float = 0.0       # Subtotal comercial
+    desp_comissoes: float = 0.0          # Comissões (corretagem)
+    desp_premiacao: float = 0.0          # Premiação de corretores
+    desp_stand: float = 0.0              # Stand de vendas / Central de vendas
+    desp_coordenacao: float = 0.0        # Coordenação comercial
 
-    # === Detalhamento de despesas ===
-    despesa_comercial: float = 0.0
-    despesa_administrativa: float = 0.0
-    despesa_tributaria: float = 0.0
-    despesa_cartorial: float = 0.0
+    # -- Despesas de Marketing --
+    desp_marketing: float = 0.0
 
-    # === Indicadores ===
-    margem_vgv: float = 0.0       # % Resultado / VGV
-    margem_custo: float = 0.0     # % Resultado / Custo Total
-    tir_mensal: float = 0.0       # % IRR mensal
-    tir_anual: float = 0.0        # % IRR anual
-    vpl: float = 0.0              # VPL (R$)
-    payback_meses: int = 0        # Meses até fluxo acumulado positivo
-    exposicao_maxima: float = 0.0  # Maior saldo negativo acumulado (R$)
+    # -- Despesas Administrativas --
+    despesa_administrativa: float = 0.0  # Subtotal administrativo
+    desp_admin: float = 0.0              # Despesas administrativas SPE
+    desp_gestao: float = 0.0             # Taxa de gestão / Gerenciamento
+    desp_seguros: float = 0.0            # Seguros
+    desp_preop: float = 0.0              # Pré-operacionais / Desenvolvimento
+
+    # -- Despesas Cartoriais --
+    despesa_cartorial: float = 0.0       # Subtotal cartorial
+    desp_ri: float = 0.0                 # Registro de incorporação / loteamento
+    desp_escrituras: float = 0.0         # Escrituras e registros
+
+    # -- Despesas Tributárias --
+    despesa_tributaria: float = 0.0      # Impostos sobre receita
+
+    # === RESULTADO ===
+    atividades_operacionais: float = 0.0 # Receita - Dedutores - Custos - Despesas
+    resultado_projeto: float = 0.0       # = Atividades operacionais
+
+    # === INDICADORES ===
+    margem_vgv: float = 0.0             # % Resultado / VGV
+    margem_custo: float = 0.0           # % Resultado / Custo Total
+    margem_receita_liq: float = 0.0     # % Resultado / Receita Líquida
+    tir_mensal: float = 0.0             # % IRR mensal
+    tir_anual: float = 0.0              # % IRR anual
+    vpl: float = 0.0                    # VPL (R$)
+    payback_meses: int = 0              # Meses até fluxo acumulado positivo
+    exposicao_maxima: float = 0.0       # Maior saldo negativo acumulado (R$)
     lucro_sobre_investimento: float = 0.0  # Resultado / Exposição Máxima
 
     # === Fluxo mensal (para gráficos) ===
@@ -281,11 +348,17 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
 
     # Aplicar distrato (reduzir vendas líquidas)
     fator_liquido = 1 - distrato_pct
+    sim.num_unidades_liquidas = num_unidades * fator_liquido
+    sim.vgv_cancelado = vgv * distrato_pct
 
     # ===================================================================
-    # 4. Cronograma de receitas (recebimentos mensais)
+    # 4. Cronograma de receitas (recebimentos mensais) — com breakdown
     # ===================================================================
     receitas = [0.0] * total_meses
+    # Acumuladores por tipo de recebimento
+    acum_entrada = 0.0
+    acum_parcelas = 0.0
+    acum_intermediarias = 0.0
 
     for m in range(total_meses):
         un = unidades_vendas[m] * fator_liquido
@@ -296,6 +369,7 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         if e_loteamento:
             # Entrada: distribuída em N parcelas
             valor_entrada = valor_venda * tv_entrada_pct
+            acum_entrada += valor_entrada
             for k in range(tv_num_parc_entrada):
                 idx = m + k
                 if idx < total_meses:
@@ -303,6 +377,7 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
 
             # Saldo parcelado
             valor_saldo = valor_venda * tv_saldo_pct
+            acum_parcelas += valor_saldo
             inicio_saldo = m + tv_num_parc_entrada
             parcelas_efetivas = min(tv_num_parcelas, total_meses - inicio_saldo)
             if parcelas_efetivas > 0:
@@ -313,6 +388,7 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
             # Intermediárias (anuais)
             if tv_intermediarias_pct > 0:
                 valor_inter = valor_venda * tv_intermediarias_pct
+                acum_intermediarias += valor_inter
                 for ano in range(1, (total_meses - m) // 12 + 1):
                     idx = m + ano * 12
                     if idx < total_meses:
@@ -320,12 +396,13 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         else:
             # Incorporação
             # Entrada: no ato da venda
+            acum_entrada += valor_venda * tv_entrada_pct
             receitas[m] += valor_venda * tv_entrada_pct
 
             # Parcelas durante obra
             valor_parc = valor_venda * tv_parcelas_obra_pct
-            parc_restantes = min(tv_num_parcelas_obra, max(mes_entrega - m, 1))
-            if parc_restantes > 0:
+            acum_parcelas += valor_parc
+            if tv_num_parcelas_obra > 0:
                 mensal = valor_parc / tv_num_parcelas_obra
                 for k in range(1, tv_num_parcelas_obra + 1):
                     idx = m + k
@@ -333,48 +410,62 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
                         receitas[idx] += mensal
 
             # Financiamento bancário: na entrega das chaves
+            financ_valor = valor_venda * tv_financiamento_pct
+            acum_intermediarias += financ_valor
             if mes_entrega < total_meses:
-                receitas[mes_entrega] += valor_venda * tv_financiamento_pct
+                receitas[mes_entrega] += financ_valor
 
             # Reforços: a cada 6 meses até entrega
             if tv_reforcos_pct > 0:
+                valor_ref_total = valor_venda * tv_reforcos_pct
+                acum_intermediarias += valor_ref_total
                 num_reforcos = max(1, (mes_entrega - m) // 6)
-                valor_reforco = valor_venda * tv_reforcos_pct / num_reforcos
+                valor_reforco = valor_ref_total / num_reforcos
                 for r in range(1, num_reforcos + 1):
                     idx = m + r * 6
                     if idx < total_meses:
                         receitas[idx] += valor_reforco
 
+    # Receita bruta (antes de inadimplência)
+    receita_bruta_total = sum(receitas)
+    sim.receita_bruta = receita_bruta_total
+    sim.receita_entrada = acum_entrada
+    sim.receita_parcelas = acum_parcelas
+    sim.receita_intermediarias = acum_intermediarias
+
     # Aplicar inadimplência sobre receitas (redução)
+    sim.valor_inadimplencia = receita_bruta_total * inadimplencia_pct
+    sim.valor_distrato = vgv * distrato_pct  # VGV perdido por distrato
     receitas = [r * (1 - inadimplencia_pct) for r in receitas]
     sim.receita_liquida = sum(receitas)
 
     # ===================================================================
-    # 5. Cronograma de custos
+    # 5. Cronograma de custos — com breakdown individual
     # ===================================================================
     custos = [0.0] * total_meses
 
     # Terreno: mês 0
     valor_terreno = vgv * terreno_pct_vgv
-    sim.custo_terreno = valor_terreno
+    sim.custo_terreno_aquisicao = valor_terreno
     if total_meses > 0:
         custos[0] += valor_terreno
 
     # ITBI sobre terreno
     itbi_valor = valor_terreno * itbi_pct
+    sim.custo_itbi = itbi_valor
     if total_meses > 0:
         custos[0] += itbi_valor
 
     # Projetos: distribuído no período pré-lançamento
     valor_projetos = vgv * projetos_pct
     valor_aprovacoes = vgv * aprovacoes_pct
-    sim.custo_projetos_aprovacoes = valor_projetos + valor_aprovacoes
+    sim.custo_projetos = valor_projetos
+    sim.custo_aprovacoes = valor_aprovacoes
 
     if prazo_registro > 0:
         mensal_proj = valor_projetos / prazo_registro
         for m in range(min(prazo_registro, total_meses)):
             custos[m] += mensal_proj
-        # Aprovações: no final do registro
         idx_aprov = min(prazo_registro - 1, total_meses - 1)
         custos[idx_aprov] += valor_aprovacoes
     else:
@@ -383,8 +474,8 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
 
     # Construção: distribuída pela curva de desembolso durante obra
     custo_construcao_com_bdi = custo_construcao_base * (1 + bdi_pct)
-    sim.custo_construcao_infra = custo_construcao_base
-    sim.custo_bdi = custo_construcao_base * bdi_pct
+    sim.custo_obra_raso = custo_construcao_base
+    sim.custo_admin_obra = custo_construcao_base * bdi_pct
 
     curva = CURVA_DESEMBOLSO.get(inputs.tipologia,
                                   CURVA_DESEMBOLSO[Tipologia.INCORPORACAO_VERTICAL])
@@ -400,43 +491,52 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         custos[mes_real] += custo_construcao_com_bdi * (desemb_atual - desemb_anterior)
 
     # IPTU: mensal durante todo o projeto (até entrega)
+    iptu_total = 0.0
     if valor_terreno > 0 and iptu_pct > 0:
         iptu_mensal = valor_terreno * iptu_pct / 12
         for m in range(min(mes_entrega + 1, total_meses)):
             custos[m] += iptu_mensal
-        sim.custo_outros = iptu_mensal * min(mes_entrega + 1, total_meses) + itbi_valor
+        iptu_total = iptu_mensal * min(mes_entrega + 1, total_meses)
+    sim.custo_iptu = iptu_total
 
+    # Subtotais de custo
+    sim.custo_obra_total = custo_construcao_base + sim.custo_admin_obra + valor_projetos + valor_aprovacoes
+    sim.custo_terreno_total = valor_terreno + itbi_valor + iptu_total
     sim.custo_total = sum(custos)
 
     # ===================================================================
-    # 6. Cronograma de despesas
+    # 6. Cronograma de despesas — com breakdown individual
     # ===================================================================
     despesas = [0.0] * total_meses
 
     # --- Despesas pré-operacionais ---
     valor_preop = vgv * preop_pct
+    sim.desp_preop = valor_preop
     if total_meses > 0:
         despesas[0] += valor_preop
 
     # --- RI (Registro de Incorporação) ---
     valor_ri = vgv * ri_pct
+    sim.desp_ri = valor_ri
     if prazo_registro > 0 and prazo_registro < total_meses:
         despesas[prazo_registro - 1] += valor_ri
     elif total_meses > 0:
         despesas[0] += valor_ri
 
     # --- Comerciais: proporcionais às vendas ---
-    total_comercial_pct = corretagem_pct + marketing_pct + stand_pct + coordenacao_pct + premiacao_pct
+    sim.desp_comissoes = vgv * corretagem_pct
+    sim.desp_premiacao = vgv * premiacao_pct
+    sim.desp_stand = vgv * stand_pct
+    sim.desp_coordenacao = vgv * coordenacao_pct
+    sim.desp_marketing = vgv * marketing_pct
 
     for m in range(total_meses):
         if unidades_vendas[m] > 0:
             valor_vendido_mes = ticket * unidades_vendas[m]
-            # Corretagem: sobre o valor vendido
             despesas[m] += valor_vendido_mes * corretagem_pct
-            # Premiação: sobre o valor vendido
             despesas[m] += valor_vendido_mes * premiacao_pct
 
-    # Marketing e stand: distribuídos ao longo do período de vendas
+    # Marketing e coordenação: distribuídos ao longo do período de vendas
     periodo_vendas_inicio = mes_lancamento
     periodo_vendas_fim = min(mes_entrega + 12, total_meses)
     meses_vendas = max(periodo_vendas_fim - periodo_vendas_inicio, 1)
@@ -454,7 +554,9 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         despesas[mes_lancamento] += valor_stand
 
     # --- Administrativas + Gestão: mensal ao longo do projeto ---
-    meses_projeto = max(mes_entrega + 6, 12)  # até 6 meses pós-entrega
+    meses_projeto = max(mes_entrega + 6, 12)
+    sim.desp_admin = vgv * admin_pct
+    sim.desp_gestao = vgv * gestao_pct
     admin_mensal = vgv * admin_pct / meses_projeto
     gestao_mensal = vgv * gestao_pct / meses_projeto
     for m in range(min(meses_projeto, total_meses)):
@@ -462,6 +564,7 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
 
     # --- Seguros: anual ---
     valor_seguros = vgv * seguros_pct
+    sim.desp_seguros = valor_seguros
     anos_projeto = max(1, meses_projeto // 12)
     for ano in range(anos_projeto):
         idx = ano * 12
@@ -470,6 +573,7 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
 
     # --- Escrituras e registros: na entrega ---
     valor_escrituras = vgv * escrituras_pct
+    sim.desp_escrituras = valor_escrituras
     if mes_entrega < total_meses:
         despesas[mes_entrega] += valor_escrituras
 
@@ -478,10 +582,13 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         despesas[m] += receitas[m] * aliquota_trib
 
     # Totalizar despesas por tipo
-    sim.despesa_comercial = vgv * total_comercial_pct
-    sim.despesa_administrativa = vgv * (admin_pct + gestao_pct + seguros_pct + preop_pct)
+    sim.despesa_comercial = (sim.desp_comissoes + sim.desp_premiacao +
+                             sim.desp_stand + sim.desp_coordenacao)
+    sim.despesa_administrativa = (sim.desp_admin + sim.desp_gestao +
+                                  sim.desp_seguros + sim.desp_preop)
     sim.despesa_tributaria = sim.receita_liquida * aliquota_trib
-    sim.despesa_cartorial = vgv * (ri_pct + escrituras_pct) + valor_terreno * itbi_pct
+    sim.impostos_total = sim.despesa_tributaria
+    sim.despesa_cartorial = valor_ri + valor_escrituras
     sim.despesa_total = sum(despesas)
 
     # ===================================================================
@@ -503,6 +610,8 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     sim.despesas_mensais = despesas
 
     # Resultado
+    sim.atividades_operacionais = sim.receita_liquida - sim.impostos_total - sim.custo_total - (
+        sim.despesa_total - sim.impostos_total)  # impostos já estão em despesa_total
     sim.resultado_projeto = sim.receita_liquida - sim.custo_total - sim.despesa_total
 
     # Margens
@@ -510,6 +619,8 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         sim.margem_vgv = (sim.resultado_projeto / vgv) * 100
     if sim.custo_total > 0:
         sim.margem_custo = (sim.resultado_projeto / sim.custo_total) * 100
+    if sim.receita_liquida > 0:
+        sim.margem_receita_liq = (sim.resultado_projeto / sim.receita_liquida) * 100
 
     # Exposição máxima
     sim.exposicao_maxima = min(fluxo_acumulado) if fluxo_acumulado else 0.0
