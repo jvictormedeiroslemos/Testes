@@ -34,7 +34,7 @@ from exportador import (
     premissas_para_dataframe,
     tabela_vendas_para_dataframe,
 )
-from simulador import simular
+from simulador import simular, gerar_diagnostico, _get_premissa_valor
 from cidades import CIDADES_POR_ESTADO
 
 # ---------------------------------------------------------------------------
@@ -1077,6 +1077,155 @@ elif st.session_state["etapa"] == 3:
                         f"R$ {sim.vpl:,.0f}. O projeto não remunera o capital investido "
                         f"à taxa mínima de atratividade definida."
                     )
+
+                # === Diagnóstico e Recomendações ===
+                st.markdown("---")
+                st.markdown("### Diagnóstico e Recomendações")
+                st.markdown(
+                    "Análise comparativa das premissas atuais contra benchmarks "
+                    "de mercado, com sugestões para melhorar o resultado do projeto."
+                )
+
+                diagnostico = gerar_diagnostico(resultado, sim)
+
+                if not diagnostico:
+                    st.success("Todas as premissas estão dentro dos padrões de mercado.")
+                else:
+                    # Contadores
+                    n_criticos = sum(1 for d in diagnostico if d.severidade == "critico")
+                    n_atencao = sum(1 for d in diagnostico if d.severidade == "atencao")
+                    n_positivos = sum(1 for d in diagnostico if d.severidade == "positivo")
+
+                    # Resumo do diagnóstico
+                    res_col1, res_col2, res_col3 = st.columns(3)
+                    res_col1.metric("Pontos Críticos", n_criticos)
+                    res_col2.metric("Pontos de Atenção", n_atencao)
+                    res_col3.metric("Pontos Positivos", n_positivos)
+
+                    st.markdown("")
+
+                    # Renderizar cada item
+                    for i, item in enumerate(diagnostico):
+                        if item.severidade == "critico":
+                            icone = "🔴"
+                            cor_titulo = "Crítico"
+                        elif item.severidade == "atencao":
+                            icone = "🟡"
+                            cor_titulo = "Atenção"
+                        else:
+                            icone = "🟢"
+                            cor_titulo = "Positivo"
+
+                        cat_label = {
+                            "receita": "Receita",
+                            "custo": "Custo",
+                            "despesa": "Despesa",
+                            "financeiro": "Financeiro",
+                            "tese": "Tese de Negócio",
+                        }.get(item.categoria, item.categoria)
+
+                        with st.expander(
+                            f"{icone} **[{cor_titulo}]** {item.titulo}  —  _{cat_label}_",
+                            expanded=(item.severidade == "critico"),
+                        ):
+                            st.markdown(item.descricao)
+                            st.markdown("")
+
+                            comp_col1, comp_col2 = st.columns(2)
+                            comp_col1.metric("Valor Atual", item.premissa_atual)
+                            comp_col2.metric("Benchmark de Mercado", item.benchmark)
+
+                            if item.severidade != "positivo":
+                                st.markdown("---")
+                                st.markdown(f"**Recomendação:**")
+                                st.info(item.sugestao)
+                            else:
+                                st.markdown("---")
+                                st.markdown(f"**Comentário:** {item.sugestao}")
+
+                    # Síntese final
+                    if n_criticos > 0:
+                        st.markdown("---")
+                        st.markdown("### Síntese — O que fazer para viabilizar o projeto")
+
+                        # Calcular gap de margem
+                        margem_alvo = 18.0
+                        gap = margem_alvo - sim.margem_vgv
+                        gap_reais = sim.vgv * gap / 100
+
+                        st.markdown(
+                            f"Para atingir uma **margem de {margem_alvo:.0f}%**, o projeto "
+                            f"precisa melhorar o resultado em aproximadamente "
+                            f"**R$ {gap_reais:,.0f}** ({gap:.1f}pp do VGV)."
+                        )
+
+                        st.markdown("**Alavancas prioritárias (por ordem de impacto):**")
+
+                        # Gerar alavancas dinamicamente
+                        alavancas = []
+                        terreno_pct = sim.custo_terreno / sim.vgv * 100 if sim.vgv > 0 else 0
+                        if terreno_pct > 15:
+                            economia = sim.vgv * (terreno_pct - 15) / 100
+                            alavancas.append(
+                                f"**Terreno**: renegociar de {terreno_pct:.0f}% para 15% do VGV "
+                                f"— economia de ~R$ {economia:,.0f}"
+                            )
+
+                        constr_pct = sim.custo_construcao_infra / sim.vgv * 100 if sim.vgv > 0 else 0
+                        bench_c = 35 if resultado.e_loteamento else 40
+                        if constr_pct > bench_c:
+                            economia = sim.vgv * (constr_pct - bench_c) / 100
+                            alavancas.append(
+                                f"**Construção**: otimizar de {constr_pct:.0f}% para "
+                                f"{bench_c}% do VGV — economia de ~R$ {economia:,.0f}"
+                            )
+
+                        comerc_pct = sim.despesa_comercial / sim.vgv * 100 if sim.vgv > 0 else 0
+                        if comerc_pct > 9:
+                            economia = sim.vgv * (comerc_pct - 9) / 100
+                            alavancas.append(
+                                f"**Despesas Comerciais**: reduzir de {comerc_pct:.0f}% para "
+                                f"9% do VGV — economia de ~R$ {economia:,.0f}"
+                            )
+
+                        aliq = _get_premissa_valor(resultado, "Alíquota tributária (regime sugerido)", 0)
+                        if aliq > 4.5:
+                            economia = sim.receita_liquida * (aliq - 4.0) / 100
+                            alavancas.append(
+                                f"**Regime tributário**: migrar para RET (4%) "
+                                f"— economia de ~R$ {economia:,.0f}"
+                            )
+
+                        distrato_v = _get_premissa_valor(resultado, "Taxa de distrato estimada", 0)
+                        bench_d = 8.0
+                        if distrato_v > bench_d + 3:
+                            receita_extra = sim.vgv * (distrato_v - bench_d) / 100 * 0.7
+                            alavancas.append(
+                                f"**Distrato**: reduzir de {distrato_v:.0f}% para {bench_d:.0f}% "
+                                f"— receita extra de ~R$ {receita_extra:,.0f}"
+                            )
+
+                        if not alavancas:
+                            alavancas.append(
+                                "Buscar otimizações incrementais em múltiplas linhas "
+                                "de custo e despesa."
+                            )
+
+                        for idx, alav in enumerate(alavancas, 1):
+                            st.markdown(f"{idx}. {alav}")
+
+                        economia_total = sum(
+                            sim.vgv * max(0, (sim.custo_terreno / sim.vgv * 100) - 15) / 100
+                            if sim.vgv > 0 else 0
+                            for _ in [1]
+                        )
+
+                        st.markdown("")
+                        st.info(
+                            "Ajuste as premissas nas abas anteriores (Receita, Custo, "
+                            "Despesa, Financeiro, Tabela de Vendas) e o resultado será "
+                            "recalculado automaticamente nesta simulação."
+                        )
 
         st.markdown("---")
 
