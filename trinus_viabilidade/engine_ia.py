@@ -40,6 +40,26 @@ Você DEVE retornar EXCLUSIVAMENTE um JSON válido com a seguinte estrutura:
             "justificativa": "Breve explicação do ajuste"
         }
     },
+    "cronograma": {
+        "resumo": "Explicação geral do cronograma sugerido e sua lógica",
+        "marcos": {
+            "inicio_projeto": {
+                "justificativa": "Por que este é o melhor mês para iniciar o projeto"
+            },
+            "lancamento": {
+                "justificativa": "Explicação de por que o lançamento ocorre neste momento (vinculado ao prazo de registro/incorporação)"
+            },
+            "inicio_obra": {
+                "justificativa": "Explicação de quando a obra deve iniciar e por quê"
+            },
+            "fim_obra": {
+                "justificativa": "Explicação do prazo de obra e conclusão (vinculado à premissa de prazo de obra)"
+            },
+            "inicio_vendas_pos": {
+                "justificativa": "Explicação de quando iniciam as vendas pós-obra"
+            }
+        }
+    },
     "insights": [
         "Insight 1 sobre o mercado local",
         "Insight 2 sobre oportunidades ou riscos"
@@ -61,6 +81,10 @@ REGRAS IMPORTANTES:
 - Considere as premissas expandidas: coordenação comercial, premiação, \
   taxa de gestão, seguros, despesas pré-operacionais, CRI, BDI, \
   custo de projetos e aprovações, IPTU do terreno, curva de vendas por fase
+- No campo "cronograma", explique a lógica do cronograma sugerido vinculando \
+  cada marco às premissas de prazo relevantes (ex: lançamento vinculado ao \
+  prazo de registro de incorporação/loteamento, conclusão da obra vinculada \
+  ao prazo de obra estimado). Justifique cada data de forma clara e objetiva.
 - Responda SEMPRE em português brasileiro
 - NÃO inclua texto fora do JSON
 """
@@ -173,6 +197,7 @@ def gerar_premissas_com_ia(
         ia_metadata = {
             "insights": resultado_ia.get("insights", []),
             "recomendacoes": resultado_ia.get("recomendacoes", []),
+            "cronograma": resultado_ia.get("cronograma", {}),
             "modelo": "claude-sonnet-4-5-20250929",
             "ajustes_aplicados": ajustes_aplicados,
         }
