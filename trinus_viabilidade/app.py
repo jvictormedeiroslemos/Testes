@@ -14,6 +14,7 @@ from pathlib import Path
 # Garantir que o diretório do app está no path
 sys.path.insert(0, str(Path(__file__).parent))
 
+import pandas as pd
 import streamlit as st
 
 from modelos import (
@@ -33,6 +34,7 @@ from exportador import (
     premissas_para_dataframe,
     tabela_vendas_para_dataframe,
 )
+from simulador import simular
 from cidades import CIDADES_POR_ESTADO
 
 # ---------------------------------------------------------------------------
@@ -145,7 +147,7 @@ st.title("Gerador de Premissas de Viabilidade Imobiliária")
 # Funções auxiliares de renderização
 # =====================================================================
 def _renderizar_premissas(premissas: list, editadas: dict):
-    """Renderiza uma lista de premissas com campos editáveis."""
+    """Renderiza uma lista de premissas — todas editáveis, com aviso fora do range."""
     if not premissas:
         st.info("Nenhuma premissa nesta categoria.")
         return
@@ -168,43 +170,50 @@ def _renderizar_premissas(premissas: list, editadas: dict):
                         st.caption(p.descricao)
 
                 with col_valor:
-                    if p.editavel:
-                        # Determinar step e format baseado na unidade
-                        if p.unidade == "R$":
-                            step = 1000.0
-                            fmt = "%.2f"
-                        elif p.unidade == "R$/m²":
-                            step = 50.0
-                            fmt = "%.2f"
-                        elif "%" in p.unidade:
-                            step = 0.1
-                            fmt = "%.2f"
-                        elif p.unidade == "meses":
-                            step = 1.0
-                            fmt = "%.0f"
-                        elif p.unidade == "m²":
-                            step = 5.0
-                            fmt = "%.1f"
-                        else:
-                            step = 1.0
-                            fmt = "%.2f"
-
-                        novo_valor = st.number_input(
-                            f"{p.unidade}",
-                            min_value=0.0,
-                            value=float(editadas.get(p.nome, p.valor)),
-                            step=step,
-                            format=fmt,
-                            key=f"edit_{p.nome}",
-                            label_visibility="collapsed",
-                        )
-                        editadas[p.nome] = novo_valor
-                        st.caption(f"{p.unidade}")
+                    # Determinar step e format baseado na unidade
+                    if p.unidade == "R$":
+                        step = 1000.0
+                        fmt = "%.2f"
+                    elif p.unidade == "R$/m²":
+                        step = 50.0
+                        fmt = "%.2f"
+                    elif "%" in p.unidade:
+                        step = 0.1
+                        fmt = "%.2f"
+                    elif p.unidade == "meses":
+                        step = 1.0
+                        fmt = "%.0f"
+                    elif p.unidade == "m²":
+                        step = 5.0
+                        fmt = "%.1f"
                     else:
-                        if p.unidade == "R$":
-                            st.markdown(f"**R$ {p.valor:,.2f}**".replace(",", "X").replace(".", ",").replace("X", "."))
-                        else:
-                            st.markdown(f"**{p.valor:,.2f} {p.unidade}**")
+                        step = 1.0
+                        fmt = "%.2f"
+
+                    novo_valor = st.number_input(
+                        f"{p.unidade}",
+                        min_value=0.0,
+                        value=float(editadas.get(p.nome, p.valor)),
+                        step=step,
+                        format=fmt,
+                        key=f"edit_{p.nome}",
+                        label_visibility="collapsed",
+                    )
+                    editadas[p.nome] = novo_valor
+                    st.caption(f"{p.unidade}")
+
+                    # Aviso quando fora do range sugerido
+                    if p.valor_min > 0 or p.valor_max > 0:
+                        if novo_valor < p.valor_min:
+                            st.warning(
+                                f"Abaixo do mínimo sugerido ({p.valor_min:,.2f})",
+                                icon="⚠️",
+                            )
+                        elif novo_valor > p.valor_max:
+                            st.warning(
+                                f"Acima do máximo sugerido ({p.valor_max:,.2f})",
+                                icon="⚠️",
+                            )
 
                 with col_range:
                     if p.unidade == "R$":
@@ -588,8 +597,8 @@ elif st.session_state["etapa"] == 3:
         )
 
         # Tabs por categoria
-        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas, tab_resumo_dfc = st.tabs(
-            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas", "Resumo DFC"]
+        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas, tab_resumo_dfc, tab_simulacao = st.tabs(
+            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas", "Resumo DFC", "Simulação"]
         )
 
         editadas = st.session_state.get("premissas_editadas", {})
@@ -614,7 +623,7 @@ elif st.session_state["etapa"] == 3:
             st.subheader("Premissas Financeiras")
             _renderizar_premissas(resultado.por_categoria("Financeiro"), editadas)
 
-        # --- Tabela de vendas ---
+        # --- Tabela de vendas (editável) ---
         with tab_vendas:
             if resultado.tabela_vendas_loteamento:
                 # ========= LOTEAMENTO =========
@@ -622,28 +631,81 @@ elif st.session_state["etapa"] == 3:
                 st.subheader("Tabela de Vendas — Loteamento")
                 st.markdown(
                     "Modelo de **parcelamento direto** pelo loteador. "
-                    "Não há financiamento bancário na entrega das chaves."
+                    "Não há financiamento bancário na entrega das chaves. "
+                    "Edite os valores abaixo conforme necessário."
                 )
 
                 col1, col2, col3 = st.columns(3)
-                col1.metric("Entrada", f"{tv.entrada_pct}%",
-                            help=f"Em {tv.num_parcelas_entrada} parcelas")
-                col2.metric("Saldo Parcelado", f"{tv.saldo_parcelado_pct}%",
-                            help=f"Em {tv.num_parcelas}x ({tv.sistema_amortizacao})")
-                col3.metric("Intermediárias", f"{tv.intermediarias_pct}%",
-                            help="Parcelas semestrais/anuais")
+                with col1:
+                    tv.entrada_pct = st.number_input(
+                        "Entrada (%)", min_value=0.0, max_value=100.0,
+                        value=float(tv.entrada_pct), step=1.0, format="%.1f",
+                        key="tv_lot_entrada",
+                    )
+                with col2:
+                    tv.saldo_parcelado_pct = st.number_input(
+                        "Saldo Parcelado (%)", min_value=0.0, max_value=100.0,
+                        value=float(tv.saldo_parcelado_pct), step=1.0, format="%.1f",
+                        key="tv_lot_saldo",
+                    )
+                with col3:
+                    tv.intermediarias_pct = st.number_input(
+                        "Intermediárias (%)", min_value=0.0, max_value=50.0,
+                        value=float(tv.intermediarias_pct), step=1.0, format="%.1f",
+                        key="tv_lot_inter",
+                    )
+
+                # Validar soma
+                soma_lot = tv.entrada_pct + tv.saldo_parcelado_pct + tv.intermediarias_pct
+                if abs(soma_lot - 100.0) > 0.5:
+                    st.warning(
+                        f"A soma Entrada + Saldo + Intermediárias = {soma_lot:.1f}%. "
+                        f"O ideal é que totalize 100%.",
+                        icon="⚠️",
+                    )
 
                 st.markdown("---")
                 st.markdown("**Detalhes do Parcelamento:**")
                 det_col1, det_col2 = st.columns(2)
                 with det_col1:
-                    st.markdown(f"- **Nº de parcelas:** {tv.num_parcelas}x")
-                    st.markdown(f"- **Sistema de amortização:** {tv.sistema_amortizacao}")
-                    st.markdown(f"- **Parcelas da entrada:** {tv.num_parcelas_entrada}x")
+                    tv.num_parcelas = st.number_input(
+                        "Nº de parcelas", min_value=12, max_value=360,
+                        value=int(tv.num_parcelas), step=12,
+                        key="tv_lot_num_parc",
+                    )
+                    tv.num_parcelas_entrada = st.number_input(
+                        "Parcelas da entrada", min_value=1, max_value=12,
+                        value=int(tv.num_parcelas_entrada), step=1,
+                        key="tv_lot_parc_ent",
+                    )
                 with det_col2:
+                    tv.juros_am = st.number_input(
+                        "Juros (% a.m.)", min_value=0.0, max_value=3.0,
+                        value=float(tv.juros_am), step=0.05, format="%.2f",
+                        key="tv_lot_juros",
+                    )
+                    if tv.juros_am < 0.50 or tv.juros_am > 1.0:
+                        st.warning(
+                            f"Juros fora da faixa típica (0,50% a 1,00% a.m.)",
+                            icon="⚠️",
+                        )
                     juros_aa = round(((1 + tv.juros_am / 100) ** 12 - 1) * 100, 2)
-                    st.markdown(f"- **Juros:** {tv.juros_am}% a.m. ({juros_aa}% a.a.)")
-                    st.markdown(f"- **Indexador:** {tv.indexador}")
+                    st.caption(f"Equivalente anual: {juros_aa}% a.a.")
+
+                    tv.sistema_amortizacao = st.selectbox(
+                        "Sistema de amortização",
+                        options=["Price", "Gradiente", "SAC"],
+                        index=["Price", "Gradiente", "SAC"].index(tv.sistema_amortizacao)
+                        if tv.sistema_amortizacao in ["Price", "Gradiente", "SAC"] else 0,
+                        key="tv_lot_sistema",
+                    )
+
+                tv.indexador = st.selectbox(
+                    "Indexador de correção",
+                    options=["IPCA", "IGPM"],
+                    index=["IPCA", "IGPM"].index(tv.indexador) if tv.indexador in ["IPCA", "IGPM"] else 0,
+                    key="tv_lot_indexador",
+                )
 
                 st.info(
                     "Em loteamentos, o incorporador/loteador financia diretamente o comprador. "
@@ -651,32 +713,75 @@ elif st.session_state["etapa"] == 3:
                     "**Gradiente** (parcelas crescentes). Prazos de **120x a 240x** são o padrão."
                 )
 
-                df_vendas = tabela_vendas_para_dataframe(resultado)
-                if not df_vendas.empty:
-                    st.dataframe(df_vendas, use_container_width=True, hide_index=True)
-
             elif resultado.tabela_vendas:
                 # ========= INCORPORAÇÃO =========
                 tv = resultado.tabela_vendas
                 st.subheader("Tabela de Vendas — Incorporação")
                 st.markdown(
                     "Modelo de **captação + financiamento bancário** na entrega das chaves. "
-                    f"Indexação: **{tv.indexador_pre_chaves}** (pré-chaves) / "
-                    f"**{tv.indexador_pos_chaves}** (pós-chaves)."
+                    "Edite os valores abaixo conforme necessário."
                 )
 
-                df_vendas = tabela_vendas_para_dataframe(resultado)
-                st.dataframe(df_vendas, use_container_width=True, hide_index=True)
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    tv.entrada_pct = st.number_input(
+                        "Entrada (%)", min_value=0.0, max_value=100.0,
+                        value=float(tv.entrada_pct), step=1.0, format="%.1f",
+                        key="tv_inc_entrada",
+                    )
+                with col2:
+                    tv.parcelas_obra_pct = st.number_input(
+                        "Parcelas Obra (%)", min_value=0.0, max_value=100.0,
+                        value=float(tv.parcelas_obra_pct), step=1.0, format="%.1f",
+                        key="tv_inc_parcelas",
+                    )
+                with col3:
+                    tv.financiamento_pct = st.number_input(
+                        "Financiamento (%)", min_value=0.0, max_value=100.0,
+                        value=float(tv.financiamento_pct), step=1.0, format="%.1f",
+                        key="tv_inc_financiamento",
+                        help="Repasse bancário na entrega das chaves",
+                    )
+                with col4:
+                    tv.reforcos_pct = st.number_input(
+                        "Reforços (%)", min_value=0.0, max_value=50.0,
+                        value=float(tv.reforcos_pct), step=1.0, format="%.1f",
+                        key="tv_inc_reforcos",
+                        help="Parcelas semestrais/anuais",
+                    )
 
-                st.markdown("**Distribuição visual:**")
-                cols_tv = st.columns(4)
-                cols_tv[0].metric("Entrada", f"{tv.entrada_pct}%")
-                cols_tv[1].metric("Parcelas Obra", f"{tv.parcelas_obra_pct}%",
-                                  help=f"{tv.num_parcelas_obra} parcelas mensais")
-                cols_tv[2].metric("Financiamento", f"{tv.financiamento_pct}%",
-                                  help="Repasse bancário na entrega das chaves")
-                cols_tv[3].metric("Reforços", f"{tv.reforcos_pct}%",
-                                  help="Parcelas semestrais/anuais")
+                # Validar soma
+                soma_inc = tv.entrada_pct + tv.parcelas_obra_pct + tv.financiamento_pct + tv.reforcos_pct
+                if abs(soma_inc - 100.0) > 0.5:
+                    st.warning(
+                        f"A soma Entrada + Parcelas + Financiamento + Reforços = {soma_inc:.1f}%. "
+                        f"O ideal é que totalize 100%.",
+                        icon="⚠️",
+                    )
+
+                st.markdown("---")
+                det_col1, det_col2 = st.columns(2)
+                with det_col1:
+                    tv.num_parcelas_obra = st.number_input(
+                        "Nº parcelas durante obra", min_value=1, max_value=60,
+                        value=int(tv.num_parcelas_obra), step=1,
+                        key="tv_inc_num_parc",
+                    )
+                with det_col2:
+                    tv.indexador_pre_chaves = st.selectbox(
+                        "Indexador pré-chaves",
+                        options=["INCC", "IPCA", "IGPM"],
+                        index=["INCC", "IPCA", "IGPM"].index(tv.indexador_pre_chaves)
+                        if tv.indexador_pre_chaves in ["INCC", "IPCA", "IGPM"] else 0,
+                        key="tv_inc_idx_pre",
+                    )
+                    tv.indexador_pos_chaves = st.selectbox(
+                        "Indexador pós-chaves",
+                        options=["IGPM", "IPCA", "INCC"],
+                        index=["IGPM", "IPCA", "INCC"].index(tv.indexador_pos_chaves)
+                        if tv.indexador_pos_chaves in ["IGPM", "IPCA", "INCC"] else 0,
+                        key="tv_inc_idx_pos",
+                    )
 
             else:
                 st.warning("Nenhuma tabela de vendas disponível.")
@@ -752,6 +857,226 @@ elif st.session_state["etapa"] == 3:
                 fin_items = resultado.por_categoria("Financeiro")
                 for p in fin_items:
                     st.markdown(f"- **{p.nome}:** {p.valor:.2f} {p.unidade}")
+
+        # --- Simulação ---
+        with tab_simulacao:
+            st.subheader("Simulação do Resultado do Empreendimento")
+            st.markdown(
+                "Projeção financeira com base nas premissas editadas. "
+                "Altere qualquer premissa nas abas anteriores para ver o impacto no resultado."
+            )
+
+            # Aplicar edições atuais antes de simular
+            _aplicar_edicoes(resultado, editadas)
+
+            # Executar simulação
+            sim = simular(resultado)
+
+            if sim.vgv <= 0:
+                st.warning("Preencha o VGV estimado para gerar a simulação.")
+            else:
+                # === Indicadores principais ===
+                st.markdown("### Indicadores de Viabilidade")
+
+                ind_col1, ind_col2, ind_col3, ind_col4 = st.columns(4)
+                ind_col1.metric(
+                    "Resultado do Projeto",
+                    f"R$ {sim.resultado_projeto:,.0f}".replace(",", "."),
+                    delta=f"{sim.margem_vgv:.1f}% do VGV",
+                    delta_color="normal" if sim.resultado_projeto >= 0 else "inverse",
+                )
+                ind_col2.metric(
+                    "Margem sobre VGV",
+                    f"{sim.margem_vgv:.1f}%",
+                    delta="Saudável" if sim.margem_vgv >= 15 else "Atenção" if sim.margem_vgv >= 10 else "Crítico",
+                    delta_color="normal" if sim.margem_vgv >= 15 else "off" if sim.margem_vgv >= 10 else "inverse",
+                )
+                ind_col3.metric(
+                    "TIR Anual",
+                    f"{sim.tir_anual:.1f}%",
+                    delta="Atrativa" if sim.tir_anual >= 20 else "Moderada" if sim.tir_anual >= 15 else "Baixa",
+                    delta_color="normal" if sim.tir_anual >= 20 else "off" if sim.tir_anual >= 15 else "inverse",
+                )
+                ind_col4.metric(
+                    "VPL (a valor presente)",
+                    f"R$ {sim.vpl:,.0f}".replace(",", "."),
+                    delta="Viável" if sim.vpl > 0 else "Inviável",
+                    delta_color="normal" if sim.vpl > 0 else "inverse",
+                )
+
+                st.markdown("---")
+
+                ind2_col1, ind2_col2, ind2_col3, ind2_col4 = st.columns(4)
+                ind2_col1.metric(
+                    "Margem sobre Custo",
+                    f"{sim.margem_custo:.1f}%",
+                )
+                ind2_col2.metric(
+                    "Payback",
+                    f"{sim.payback_meses} meses",
+                    delta=f"~{sim.payback_meses / 12:.1f} anos",
+                )
+                ind2_col3.metric(
+                    "Exposição Máxima",
+                    f"R$ {sim.exposicao_maxima:,.0f}".replace(",", "."),
+                    help="Maior saldo negativo acumulado — capital necessário",
+                )
+                ind2_col4.metric(
+                    "Lucro / Investimento",
+                    f"{sim.lucro_sobre_investimento:.1f}%",
+                    help="Resultado / Exposição Máxima",
+                )
+
+                ind3_col1, ind3_col2 = st.columns(2)
+                ind3_col1.metric("TIR Mensal", f"{sim.tir_mensal:.2f}%")
+                ind3_col2.metric(
+                    "Receita Líquida",
+                    f"R$ {sim.receita_liquida:,.0f}".replace(",", "."),
+                )
+
+                # === DRE Resumido ===
+                st.markdown("---")
+                st.markdown("### DRE Simplificado do Projeto")
+
+                dre_data = {
+                    "Linha": [
+                        "VGV (Valor Geral de Vendas)",
+                        "(-) Distrato / Inadimplência",
+                        "= Receita Líquida",
+                        "",
+                        "(-) Custo do Terreno",
+                        f"(-) Custo de {'Infraestrutura' if resultado.e_loteamento else 'Construção'}",
+                        "(-) BDI / Administração de Obra",
+                        "(-) Projetos e Aprovações",
+                        "(-) Outros Custos (IPTU, ITBI)",
+                        "= Total de Custos",
+                        "",
+                        "(-) Despesas Comerciais",
+                        "(-) Despesas Administrativas",
+                        "(-) Despesas Tributárias",
+                        "(-) Despesas Cartoriais",
+                        "= Total de Despesas",
+                        "",
+                        "= RESULTADO DO PROJETO",
+                    ],
+                    "Valor (R$)": [
+                        f"R$ {sim.vgv:,.0f}",
+                        f"R$ {(sim.vgv - sim.receita_liquida):,.0f}",
+                        f"R$ {sim.receita_liquida:,.0f}",
+                        "",
+                        f"R$ {sim.custo_terreno:,.0f}",
+                        f"R$ {sim.custo_construcao_infra:,.0f}",
+                        f"R$ {sim.custo_bdi:,.0f}",
+                        f"R$ {sim.custo_projetos_aprovacoes:,.0f}",
+                        f"R$ {sim.custo_outros:,.0f}",
+                        f"R$ {sim.custo_total:,.0f}",
+                        "",
+                        f"R$ {sim.despesa_comercial:,.0f}",
+                        f"R$ {sim.despesa_administrativa:,.0f}",
+                        f"R$ {sim.despesa_tributaria:,.0f}",
+                        f"R$ {sim.despesa_cartorial:,.0f}",
+                        f"R$ {sim.despesa_total:,.0f}",
+                        "",
+                        f"R$ {sim.resultado_projeto:,.0f}",
+                    ],
+                    "% VGV": [
+                        "100,0%",
+                        f"{(sim.vgv - sim.receita_liquida) / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.receita_liquida / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        "",
+                        f"{sim.custo_terreno / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.custo_construcao_infra / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.custo_bdi / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.custo_projetos_aprovacoes / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.custo_outros / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.custo_total / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        "",
+                        f"{sim.despesa_comercial / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.despesa_administrativa / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.despesa_tributaria / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.despesa_cartorial / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        f"{sim.despesa_total / sim.vgv * 100:.1f}%" if sim.vgv > 0 else "-",
+                        "",
+                        f"{sim.margem_vgv:.1f}%",
+                    ],
+                }
+
+                df_dre = pd.DataFrame(dre_data)
+                st.dataframe(df_dre, use_container_width=True, hide_index=True, height=680)
+
+                # === Gráfico de Fluxo de Caixa ===
+                st.markdown("---")
+                st.markdown("### Fluxo de Caixa Acumulado")
+
+                # Preparar dados para gráfico
+                df_fluxo = pd.DataFrame({
+                    "Mês": list(range(sim.total_meses)),
+                    "Fluxo Mensal (R$)": sim.fluxo_mensal,
+                    "Acumulado (R$)": sim.fluxo_acumulado,
+                })
+
+                st.line_chart(
+                    df_fluxo.set_index("Mês")[["Acumulado (R$)"]],
+                    use_container_width=True,
+                )
+
+                # Gráfico de barras: receitas vs custos vs despesas por trimestre
+                st.markdown("### Composição Trimestral")
+                trimestres = max(1, sim.total_meses // 3)
+                trim_receitas = []
+                trim_custos = []
+                trim_despesas = []
+                trim_labels = []
+                for t in range(min(trimestres, 40)):  # máx 40 trimestres no gráfico
+                    inicio = t * 3
+                    fim = min(inicio + 3, sim.total_meses)
+                    trim_receitas.append(sum(sim.receitas_mensais[inicio:fim]))
+                    trim_custos.append(-sum(sim.custos_mensais[inicio:fim]))
+                    trim_despesas.append(-sum(sim.despesas_mensais[inicio:fim]))
+                    trim_labels.append(f"T{t + 1}")
+
+                df_trim = pd.DataFrame({
+                    "Trimestre": trim_labels,
+                    "Receitas": trim_receitas,
+                    "Custos": trim_custos,
+                    "Despesas": trim_despesas,
+                })
+                st.bar_chart(
+                    df_trim.set_index("Trimestre"),
+                    use_container_width=True,
+                )
+
+                # Avaliação final
+                st.markdown("---")
+                st.markdown("### Avaliação da Viabilidade")
+
+                if sim.margem_vgv >= 20 and sim.tir_anual >= 20 and sim.vpl > 0:
+                    st.success(
+                        f"**Projeto VIÁVEL** — Margem de {sim.margem_vgv:.1f}%, "
+                        f"TIR de {sim.tir_anual:.1f}% a.a. e VPL positivo de "
+                        f"R$ {sim.vpl:,.0f}. Indicadores acima dos benchmarks de mercado."
+                    )
+                elif sim.margem_vgv >= 12 and sim.tir_anual >= 15 and sim.vpl > 0:
+                    st.info(
+                        f"**Projeto VIÁVEL com ressalvas** — Margem de {sim.margem_vgv:.1f}%, "
+                        f"TIR de {sim.tir_anual:.1f}% a.a. O projeto é viável mas "
+                        f"tem sensibilidade a variações nas premissas. Recomenda-se "
+                        f"análise de cenários."
+                    )
+                elif sim.vpl > 0:
+                    st.warning(
+                        f"**Projeto MARGINAL** — Margem de {sim.margem_vgv:.1f}%, "
+                        f"TIR de {sim.tir_anual:.1f}% a.a. Embora o VPL seja positivo "
+                        f"(R$ {sim.vpl:,.0f}), os indicadores estão abaixo do ideal. "
+                        f"Reavalie premissas de custo e receita."
+                    )
+                else:
+                    st.error(
+                        f"**Projeto INVIÁVEL** — Margem de {sim.margem_vgv:.1f}%, "
+                        f"TIR de {sim.tir_anual:.1f}% a.a. e VPL negativo de "
+                        f"R$ {sim.vpl:,.0f}. O projeto não remunera o capital investido "
+                        f"à taxa mínima de atratividade definida."
+                    )
 
         st.markdown("---")
 
