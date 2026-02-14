@@ -30,6 +30,8 @@ from engine_ia import gerar_premissas_com_ia
 from exportador import (
     exportar_excel_bytes,
     exportar_json_bytes,
+    exportar_dfc_aberto_excel_bytes,
+    dfc_aberto_dataframe,
     inputs_para_dataframe,
     premissas_para_dataframe,
     tabela_vendas_para_dataframe,
@@ -597,8 +599,8 @@ elif st.session_state["etapa"] == 3:
         )
 
         # Tabs por categoria
-        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas, tab_resumo_dfc, tab_simulacao = st.tabs(
-            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas", "Resumo DFC", "Simulação"]
+        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas, tab_resumo_dfc, tab_simulacao, tab_dfc_aberto = st.tabs(
+            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas", "Resumo DFC", "Simulacao", "DFC Aberto"]
         )
 
         editadas = st.session_state.get("premissas_editadas", {})
@@ -1253,6 +1255,117 @@ elif st.session_state["etapa"] == 3:
                             "recalculado automaticamente nesta simulação."
                         )
 
+        # --- DFC Aberto (mês a mês) ---
+        with tab_dfc_aberto:
+            st.subheader("DFC Aberto — Fluxo de Caixa Mês a Mês")
+            st.markdown(
+                "Visão completa do fluxo de caixa aberto, com cada linha de receita, custo e despesa "
+                "detalhada mês a mês, no formato padrão Trinus. "
+                "As 3 primeiras linhas mostram os totais nominais, margem sobre receita líquida e % do VGV."
+            )
+
+            # Aplicar edições e simular
+            _aplicar_edicoes(resultado, editadas)
+            sim_dfc = simular(resultado)
+
+            if sim_dfc.vgv <= 0:
+                st.warning("Preencha o VGV estimado para gerar o DFC Aberto.")
+            else:
+                df_dfc_aberto = dfc_aberto_dataframe(sim_dfc, resultado.e_loteamento)
+
+                if df_dfc_aberto.empty:
+                    st.warning("Nenhum dado para exibir.")
+                else:
+                    # Salvar simulação para uso na exportação
+                    st.session_state["sim_dfc"] = sim_dfc
+
+                    # Controles de visualização
+                    ctrl_col1, ctrl_col2 = st.columns([1, 1])
+                    with ctrl_col1:
+                        mostrar_zeros = st.checkbox(
+                            "Mostrar meses sem movimentação",
+                            value=False,
+                            key="dfc_mostrar_zeros",
+                            help="Se desmarcado, meses onde todas as colunas financeiras são zero serão ocultados.",
+                        )
+                    with ctrl_col2:
+                        formato_display = st.radio(
+                            "Formato de exibição",
+                            options=["Valores numéricos", "Formatado (R$)"],
+                            index=0,
+                            horizontal=True,
+                            key="dfc_formato",
+                        )
+
+                    # Filtrar meses sem movimentação
+                    df_view = df_dfc_aberto.copy()
+                    if not mostrar_zeros:
+                        # Manter as 3 primeiras linhas (resumo) + linhas com algum valor != 0
+                        financial_cols = [c for c in df_view.columns if c != "Mês"]
+                        mask_summary = df_view.index < 3
+                        mask_data = pd.Series(False, index=df_view.index)
+                        for idx in df_view.index:
+                            if idx >= 3:
+                                for col in financial_cols:
+                                    val = df_view.at[idx, col]
+                                    if isinstance(val, (int, float)) and abs(val) > 0.01:
+                                        mask_data.at[idx] = True
+                                        break
+                        df_view = df_view[mask_summary | mask_data].reset_index(drop=True)
+
+                    # Formatação para exibição
+                    if formato_display == "Formatado (R$)":
+                        def _fmt_cell(val):
+                            if isinstance(val, str):
+                                return val
+                            if isinstance(val, (int, float)):
+                                if abs(val) < 0.01:
+                                    return "-"
+                                return f"R$ {val:,.0f}".replace(",", ".")
+                            return val
+
+                        df_display = df_view.copy()
+                        for col in df_display.columns:
+                            if col != "Mês":
+                                df_display[col] = df_display[col].apply(_fmt_cell)
+                    else:
+                        df_display = df_view
+
+                    st.dataframe(
+                        df_display,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=min(800, 35 * len(df_display) + 38),
+                    )
+
+                    st.markdown("---")
+
+                    # Botão de exportação do DFC Aberto
+                    st.markdown("### Exportar DFC Aberto")
+                    exp_col1, exp_col2 = st.columns(2)
+
+                    with exp_col1:
+                        excel_dfc = exportar_dfc_aberto_excel_bytes(sim_dfc, resultado.e_loteamento)
+                        st.download_button(
+                            "Baixar DFC Aberto (.xlsx)",
+                            data=excel_dfc,
+                            file_name=f"dfc_aberto_{resultado.versao}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            type="primary",
+                            use_container_width=True,
+                        )
+
+                    with exp_col2:
+                        # Exportar como CSV
+                        csv_data = df_dfc_aberto.to_csv(index=False, sep=";", decimal=",").encode("utf-8-sig")
+                        st.download_button(
+                            "Baixar DFC Aberto (.csv)",
+                            data=csv_data,
+                            file_name=f"dfc_aberto_{resultado.versao}.csv",
+                            mime="text/csv",
+                            use_container_width=True,
+                        )
+
         st.markdown("---")
 
         # Navegação
@@ -1300,7 +1413,12 @@ elif st.session_state["etapa"] == 4:
         col_exp1, col_exp2, col_exp3 = st.columns(3)
 
         with col_exp1:
-            excel_bytes = exportar_excel_bytes(resultado)
+            # Incluir DFC Aberto no Excel se simulação disponível
+            sim_export = st.session_state.get("sim_dfc")
+            if sim_export is None:
+                _aplicar_edicoes(resultado, st.session_state.get("premissas_editadas", {}))
+                sim_export = simular(resultado)
+            excel_bytes = exportar_excel_bytes(resultado, sim=sim_export)
             st.download_button(
                 "Baixar Excel (.xlsx)",
                 data=excel_bytes,

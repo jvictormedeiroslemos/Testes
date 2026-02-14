@@ -126,6 +126,50 @@ class ResultadoSimulacao:
     custos_mensais: list[float] = field(default_factory=list)
     despesas_mensais: list[float] = field(default_factory=list)
 
+    # === DFC Aberto — arrays mensais por sub-item ===
+    # Vendas
+    vendas_unidades_mensal: list[float] = field(default_factory=list)
+    vendas_unidades_acum_mensal: list[float] = field(default_factory=list)
+    vgv_vendido_mensal: list[float] = field(default_factory=list)
+
+    # Receita (breakdown)
+    rec_entrada_mensal: list[float] = field(default_factory=list)
+    rec_parcelas_mensal: list[float] = field(default_factory=list)
+    rec_intermediarias_mensal: list[float] = field(default_factory=list)
+    inadimplencia_mensal: list[float] = field(default_factory=list)
+    receita_bruta_mensal: list[float] = field(default_factory=list)
+
+    # Dedutores de receita
+    impostos_mensal: list[float] = field(default_factory=list)
+    distratos_mensal: list[float] = field(default_factory=list)
+
+    # Custos (breakdown)
+    custo_terreno_aquisicao_mensal: list[float] = field(default_factory=list)
+    custo_itbi_mensal: list[float] = field(default_factory=list)
+    custo_iptu_mensal: list[float] = field(default_factory=list)
+    custo_obra_raso_mensal: list[float] = field(default_factory=list)
+    custo_admin_obra_mensal: list[float] = field(default_factory=list)
+    custo_projetos_mensal: list[float] = field(default_factory=list)
+    custo_aprovacoes_mensal: list[float] = field(default_factory=list)
+
+    # Despesas (breakdown)
+    desp_comissoes_mensal: list[float] = field(default_factory=list)
+    desp_premiacao_mensal: list[float] = field(default_factory=list)
+    desp_marketing_mensal: list[float] = field(default_factory=list)
+    desp_stand_mensal: list[float] = field(default_factory=list)
+    desp_coordenacao_mensal: list[float] = field(default_factory=list)
+    desp_admin_mensal: list[float] = field(default_factory=list)
+    desp_gestao_mensal: list[float] = field(default_factory=list)
+    desp_seguros_mensal: list[float] = field(default_factory=list)
+    desp_preop_mensal: list[float] = field(default_factory=list)
+    desp_ri_mensal: list[float] = field(default_factory=list)
+    desp_escrituras_mensal: list[float] = field(default_factory=list)
+    desp_tributaria_mensal: list[float] = field(default_factory=list)
+
+    # Resultado
+    atividades_operacionais_mensal: list[float] = field(default_factory=list)
+    saldo_caixa_mensal: list[float] = field(default_factory=list)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -352,6 +396,23 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     sim.vgv_cancelado = vgv * distrato_pct
 
     # ===================================================================
+    # 3.5. Rastrear vendas mensais para DFC Aberto
+    # ===================================================================
+    vendas_un_mensal = [0.0] * total_meses
+    vendas_un_acum = [0.0] * total_meses
+    vgv_vendido_m = [0.0] * total_meses
+    acum_un = 0.0
+    for m in range(total_meses):
+        un_liq = unidades_vendas[m] * fator_liquido
+        vendas_un_mensal[m] = un_liq
+        acum_un += un_liq
+        vendas_un_acum[m] = acum_un
+        vgv_vendido_m[m] = ticket * un_liq
+    sim.vendas_unidades_mensal = vendas_un_mensal
+    sim.vendas_unidades_acum_mensal = vendas_un_acum
+    sim.vgv_vendido_mensal = vgv_vendido_m
+
+    # ===================================================================
     # 4. Cronograma de receitas (recebimentos mensais) — com breakdown
     # ===================================================================
     receitas = [0.0] * total_meses
@@ -437,9 +498,17 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     sim.receita_parcelas = sum(rec_parcelas)
     sim.receita_intermediarias = sum(rec_intermediarias)
 
+    # Guardar receita bruta mensal (antes de inadimplência) para DFC Aberto
+    sim.receita_bruta_mensal = list(receitas)
+    sim.rec_entrada_mensal = list(rec_entrada)
+    sim.rec_parcelas_mensal = list(rec_parcelas)
+    sim.rec_intermediarias_mensal = list(rec_intermediarias)
+
     # Aplicar inadimplência sobre receitas (redução)
     sim.valor_inadimplencia = receita_bruta_total * inadimplencia_pct
     sim.valor_distrato = vgv * distrato_pct  # VGV perdido por distrato
+    inadimplencia_m = [r * inadimplencia_pct for r in receitas]
+    sim.inadimplencia_mensal = inadimplencia_m
     receitas = [r * (1 - inadimplencia_pct) for r in receitas]
     sim.receita_liquida = sum(receitas)
 
@@ -447,18 +516,28 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     # 5. Cronograma de custos — com breakdown individual
     # ===================================================================
     custos = [0.0] * total_meses
+    # Arrays individuais por sub-item
+    c_terreno_m = [0.0] * total_meses
+    c_itbi_m = [0.0] * total_meses
+    c_iptu_m = [0.0] * total_meses
+    c_obra_raso_m = [0.0] * total_meses
+    c_admin_obra_m = [0.0] * total_meses
+    c_projetos_m = [0.0] * total_meses
+    c_aprovacoes_m = [0.0] * total_meses
 
     # Terreno: mês 0
     valor_terreno = vgv * terreno_pct_vgv
     sim.custo_terreno_aquisicao = valor_terreno
     if total_meses > 0:
         custos[0] += valor_terreno
+        c_terreno_m[0] += valor_terreno
 
     # ITBI sobre terreno
     itbi_valor = valor_terreno * itbi_pct
     sim.custo_itbi = itbi_valor
     if total_meses > 0:
         custos[0] += itbi_valor
+        c_itbi_m[0] += itbi_valor
 
     # Projetos: distribuído no período pré-lançamento
     valor_projetos = vgv * projetos_pct
@@ -470,11 +549,15 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         mensal_proj = valor_projetos / prazo_registro
         for m in range(min(prazo_registro, total_meses)):
             custos[m] += mensal_proj
+            c_projetos_m[m] += mensal_proj
         idx_aprov = min(prazo_registro - 1, total_meses - 1)
         custos[idx_aprov] += valor_aprovacoes
+        c_aprovacoes_m[idx_aprov] += valor_aprovacoes
     else:
         if total_meses > 0:
             custos[0] += valor_projetos + valor_aprovacoes
+            c_projetos_m[0] += valor_projetos
+            c_aprovacoes_m[0] += valor_aprovacoes
 
     # Construção: distribuída pela curva de desembolso durante obra
     custo_construcao_com_bdi = custo_construcao_base * (1 + bdi_pct)
@@ -492,7 +575,12 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         pct_anterior = m / prazo_obra
         desemb_atual = _interpolar_curva(curva, pct_atual) / 100
         desemb_anterior = _interpolar_curva(curva, pct_anterior) / 100
-        custos[mes_real] += custo_construcao_com_bdi * (desemb_atual - desemb_anterior)
+        delta = desemb_atual - desemb_anterior
+        valor_obra_mes = custo_construcao_base * delta
+        valor_bdi_mes = custo_construcao_base * bdi_pct * delta
+        custos[mes_real] += valor_obra_mes + valor_bdi_mes
+        c_obra_raso_m[mes_real] += valor_obra_mes
+        c_admin_obra_m[mes_real] += valor_bdi_mes
 
     # IPTU: mensal durante todo o projeto (até entrega)
     iptu_total = 0.0
@@ -500,8 +588,18 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         iptu_mensal = valor_terreno * iptu_pct / 12
         for m in range(min(mes_entrega + 1, total_meses)):
             custos[m] += iptu_mensal
+            c_iptu_m[m] += iptu_mensal
         iptu_total = iptu_mensal * min(mes_entrega + 1, total_meses)
     sim.custo_iptu = iptu_total
+
+    # Salvar arrays individuais
+    sim.custo_terreno_aquisicao_mensal = c_terreno_m
+    sim.custo_itbi_mensal = c_itbi_m
+    sim.custo_iptu_mensal = c_iptu_m
+    sim.custo_obra_raso_mensal = c_obra_raso_m
+    sim.custo_admin_obra_mensal = c_admin_obra_m
+    sim.custo_projetos_mensal = c_projetos_m
+    sim.custo_aprovacoes_mensal = c_aprovacoes_m
 
     # Subtotais de custo
     sim.custo_obra_total = custo_construcao_base + sim.custo_admin_obra + valor_projetos + valor_aprovacoes
@@ -512,20 +610,36 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     # 6. Cronograma de despesas — com breakdown individual
     # ===================================================================
     despesas = [0.0] * total_meses
+    # Arrays individuais por sub-item
+    d_comissoes_m = [0.0] * total_meses
+    d_premiacao_m = [0.0] * total_meses
+    d_marketing_m = [0.0] * total_meses
+    d_stand_m = [0.0] * total_meses
+    d_coordenacao_m = [0.0] * total_meses
+    d_admin_m = [0.0] * total_meses
+    d_gestao_m = [0.0] * total_meses
+    d_seguros_m = [0.0] * total_meses
+    d_preop_m = [0.0] * total_meses
+    d_ri_m = [0.0] * total_meses
+    d_escrituras_m = [0.0] * total_meses
+    d_tributaria_m = [0.0] * total_meses
 
     # --- Despesas pré-operacionais ---
     valor_preop = vgv * preop_pct
     sim.desp_preop = valor_preop
     if total_meses > 0:
         despesas[0] += valor_preop
+        d_preop_m[0] += valor_preop
 
     # --- RI (Registro de Incorporação) ---
     valor_ri = vgv * ri_pct
     sim.desp_ri = valor_ri
     if prazo_registro > 0 and prazo_registro < total_meses:
         despesas[prazo_registro - 1] += valor_ri
+        d_ri_m[prazo_registro - 1] += valor_ri
     elif total_meses > 0:
         despesas[0] += valor_ri
+        d_ri_m[0] += valor_ri
 
     # --- Comerciais: proporcionais às vendas ---
     sim.desp_comissoes = vgv * corretagem_pct
@@ -537,8 +651,11 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     for m in range(total_meses):
         if unidades_vendas[m] > 0:
             valor_vendido_mes = ticket * unidades_vendas[m]
-            despesas[m] += valor_vendido_mes * corretagem_pct
-            despesas[m] += valor_vendido_mes * premiacao_pct
+            v_com = valor_vendido_mes * corretagem_pct
+            v_prem = valor_vendido_mes * premiacao_pct
+            despesas[m] += v_com + v_prem
+            d_comissoes_m[m] += v_com
+            d_premiacao_m[m] += v_prem
 
     # Marketing e coordenação: distribuídos ao longo do período de vendas
     periodo_vendas_inicio = mes_lancamento
@@ -550,12 +667,16 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     valor_coord = vgv * coordenacao_pct
 
     for m in range(periodo_vendas_inicio, min(periodo_vendas_fim, total_meses)):
-        despesas[m] += valor_marketing / meses_vendas
-        despesas[m] += valor_coord / meses_vendas
+        v_mkt = valor_marketing / meses_vendas
+        v_coord = valor_coord / meses_vendas
+        despesas[m] += v_mkt + v_coord
+        d_marketing_m[m] += v_mkt
+        d_coordenacao_m[m] += v_coord
 
     # Stand: concentrado no lançamento
     if mes_lancamento < total_meses:
         despesas[mes_lancamento] += valor_stand
+        d_stand_m[mes_lancamento] += valor_stand
 
     # --- Administrativas + Gestão: mensal ao longo do projeto ---
     meses_projeto = max(mes_entrega + 6, 12)
@@ -565,6 +686,8 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     gestao_mensal = vgv * gestao_pct / meses_projeto
     for m in range(min(meses_projeto, total_meses)):
         despesas[m] += admin_mensal + gestao_mensal
+        d_admin_m[m] += admin_mensal
+        d_gestao_m[m] += gestao_mensal
 
     # --- Seguros: anual ---
     valor_seguros = vgv * seguros_pct
@@ -573,17 +696,36 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     for ano in range(anos_projeto):
         idx = ano * 12
         if idx < total_meses:
-            despesas[idx] += valor_seguros / anos_projeto
+            v_seg = valor_seguros / anos_projeto
+            despesas[idx] += v_seg
+            d_seguros_m[idx] += v_seg
 
     # --- Escrituras e registros: na entrega ---
     valor_escrituras = vgv * escrituras_pct
     sim.desp_escrituras = valor_escrituras
     if mes_entrega < total_meses:
         despesas[mes_entrega] += valor_escrituras
+        d_escrituras_m[mes_entrega] += valor_escrituras
 
     # --- Tributária: proporcional à receita recebida ---
     for m in range(total_meses):
-        despesas[m] += receitas[m] * aliquota_trib
+        v_trib = receitas[m] * aliquota_trib
+        despesas[m] += v_trib
+        d_tributaria_m[m] += v_trib
+
+    # Salvar arrays individuais de despesas
+    sim.desp_comissoes_mensal = d_comissoes_m
+    sim.desp_premiacao_mensal = d_premiacao_m
+    sim.desp_marketing_mensal = d_marketing_m
+    sim.desp_stand_mensal = d_stand_m
+    sim.desp_coordenacao_mensal = d_coordenacao_m
+    sim.desp_admin_mensal = d_admin_m
+    sim.desp_gestao_mensal = d_gestao_m
+    sim.desp_seguros_mensal = d_seguros_m
+    sim.desp_preop_mensal = d_preop_m
+    sim.desp_ri_mensal = d_ri_m
+    sim.desp_escrituras_mensal = d_escrituras_m
+    sim.desp_tributaria_mensal = d_tributaria_m
 
     # Totalizar despesas por tipo
     sim.despesa_comercial = (sim.desp_comissoes + sim.desp_premiacao +
@@ -612,6 +754,12 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     sim.receitas_mensais = receitas
     sim.custos_mensais = custos
     sim.despesas_mensais = despesas
+
+    # DFC Aberto — impostos e resultado operacional mensal
+    sim.impostos_mensal = list(d_tributaria_m)
+    sim.distratos_mensal = [0.0] * total_meses  # distrato já descontado nas vendas
+    sim.atividades_operacionais_mensal = list(fluxo_mensal)
+    sim.saldo_caixa_mensal = list(fluxo_acumulado)
 
     # Resultado (despesa_total já inclui tributária)
     sim.resultado_projeto = sim.receita_liquida - sim.custo_total - sim.despesa_total
