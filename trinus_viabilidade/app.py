@@ -17,9 +17,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 import pandas as pd
 import streamlit as st
 
+from datetime import date
 from modelos import (
     ESTADOS_BRASIL,
     PADROES_POR_TIPOLOGIA,
+    DatasMacro,
     InputsUsuario,
     Padrao,
     Tipologia,
@@ -527,6 +529,9 @@ elif st.session_state["etapa"] == 2:
             st.session_state["resultado"] = resultado
             st.session_state["ia_metadata"] = ia_metadata
             st.session_state["premissas_editadas"] = {}
+            # Resetar datas macro para recalcular com novas premissas
+            if "datas_macro" in st.session_state:
+                del st.session_state["datas_macro"]
             ir_para_etapa(3)
             st.rerun()
 
@@ -590,6 +595,112 @@ elif st.session_state["etapa"] == 3:
             col_m3.metric("Prazo de Obra", f"{prazo_premissa.valor:.0f} meses")
         if vel_premissa:
             col_m4.metric("Veloc. Vendas", f"{vel_premissa.valor:.1f}%/mês")
+
+        st.markdown("---")
+
+        # =================================================================
+        # DATAS MACRO — Cronograma do empreendimento
+        # =================================================================
+        with st.expander("Datas Macro — Cronograma do Empreendimento", expanded=True):
+            st.markdown(
+                "Defina quando o projeto começa e as datas-chave do cronograma. "
+                "As datas são **sugeridas automaticamente** com base nos prazos das premissas. "
+                "Ajuste conforme seu planejamento real."
+            )
+
+            # Extrair prazos para sugestão automática
+            _prazo_reg = int(_get_premissa_valor(resultado, "Prazo para Registro de Incorporação/Loteamento", 6))
+            _prazo_obra = int(_get_premissa_valor(resultado, "Prazo de obra estimado", 24))
+
+            # Inicializar DatasMacro no session_state se não existir
+            if "datas_macro" not in st.session_state:
+                dm = DatasMacro()
+                dm.sugerir_a_partir_de_premissas(_prazo_reg, _prazo_obra)
+                st.session_state["datas_macro"] = dm
+
+            dm = st.session_state["datas_macro"]
+
+            dm_col1, dm_col2, dm_col3 = st.columns(3)
+            with dm_col1:
+                novo_inicio = st.date_input(
+                    "Inicio do Projeto",
+                    value=dm.inicio_projeto,
+                    key="dm_inicio_projeto",
+                    help="Mês/ano de início das atividades (projetos, aprovações).",
+                    format="MM/YYYY",
+                )
+                if isinstance(novo_inicio, date) and novo_inicio != dm.inicio_projeto:
+                    dm.inicio_projeto = novo_inicio.replace(day=1)
+                    # Recalcular sugestões quando início muda
+                    dm.inicio_aprovacoes = None
+                    dm.lancamento = None
+                    dm.inicio_obra = None
+                    dm.fim_obra = None
+                    dm.inicio_vendas_pos = None
+                    dm.sugerir_a_partir_de_premissas(_prazo_reg, _prazo_obra)
+
+            with dm_col2:
+                novo_lanc = st.date_input(
+                    "Lançamento Comercial",
+                    value=dm.lancamento or dm.inicio_projeto,
+                    key="dm_lancamento",
+                    help="Data prevista para o lançamento comercial.",
+                    format="MM/YYYY",
+                )
+                if isinstance(novo_lanc, date):
+                    dm.lancamento = novo_lanc.replace(day=1)
+
+            with dm_col3:
+                novo_inicio_obra = st.date_input(
+                    "Início da Obra",
+                    value=dm.inicio_obra or dm.lancamento,
+                    key="dm_inicio_obra",
+                    help="Data prevista para início da obra/infraestrutura.",
+                    format="MM/YYYY",
+                )
+                if isinstance(novo_inicio_obra, date):
+                    dm.inicio_obra = novo_inicio_obra.replace(day=1)
+
+            dm_col4, dm_col5, _ = st.columns(3)
+            with dm_col4:
+                novo_fim_obra = st.date_input(
+                    "Conclusão da Obra",
+                    value=dm.fim_obra or dm.inicio_projeto,
+                    key="dm_fim_obra",
+                    help="Data prevista para conclusão da obra / Habite-se.",
+                    format="MM/YYYY",
+                )
+                if isinstance(novo_fim_obra, date):
+                    dm.fim_obra = novo_fim_obra.replace(day=1)
+
+            with dm_col5:
+                novo_pos = st.date_input(
+                    "Início Vendas Pós-Obra",
+                    value=dm.inicio_vendas_pos or dm.fim_obra,
+                    key="dm_vendas_pos",
+                    help="Data de início das vendas residuais pós-obra.",
+                    format="MM/YYYY",
+                )
+                if isinstance(novo_pos, date):
+                    dm.inicio_vendas_pos = novo_pos.replace(day=1)
+
+            # Resumo visual do cronograma
+            from dateutil.relativedelta import relativedelta
+            _meses_ate_lanc = (dm.lancamento.year - dm.inicio_projeto.year) * 12 + (dm.lancamento.month - dm.inicio_projeto.month) if dm.lancamento else _prazo_reg
+            _meses_obra = (dm.fim_obra.year - dm.inicio_obra.year) * 12 + (dm.fim_obra.month - dm.inicio_obra.month) if dm.fim_obra and dm.inicio_obra else _prazo_obra
+
+            MESES_PT_FULL = [
+                "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+            ]
+            def _fmt_data(d: date) -> str:
+                return f"{MESES_PT_FULL[d.month]}/{d.year}"
+
+            st.markdown(
+                f"**Cronograma:** {_fmt_data(dm.inicio_projeto)} → "
+                f"Lançamento em {_fmt_data(dm.lancamento)} ({_meses_ate_lanc} meses) → "
+                f"Obra de {_fmt_data(dm.inicio_obra)} a {_fmt_data(dm.fim_obra)} ({_meses_obra} meses)"
+            )
 
         st.markdown("---")
         st.markdown(
@@ -872,7 +983,7 @@ elif st.session_state["etapa"] == 3:
             _aplicar_edicoes(resultado, editadas)
 
             # Executar simulação
-            sim = simular(resultado)
+            sim = simular(resultado, datas_macro=st.session_state.get("datas_macro"))
 
             if sim.vgv <= 0:
                 st.warning("Preencha o VGV estimado para gerar a simulação.")
@@ -1038,7 +1149,7 @@ elif st.session_state["etapa"] == 3:
 
                 # Preparar dados para gráfico
                 df_fluxo = pd.DataFrame({
-                    "Mês": list(range(sim.total_meses)),
+                    "Mês": sim.labels_mes if sim.labels_mes else list(range(sim.total_meses)),
                     "Fluxo Mensal (R$)": sim.fluxo_mensal,
                     "Acumulado (R$)": sim.fluxo_acumulado,
                 })
@@ -1061,7 +1172,11 @@ elif st.session_state["etapa"] == 3:
                     trim_receitas.append(sum(sim.receitas_mensais[inicio:fim]))
                     trim_custos.append(-sum(sim.custos_mensais[inicio:fim]))
                     trim_despesas.append(-sum(sim.despesas_mensais[inicio:fim]))
-                    trim_labels.append(f"T{t + 1}")
+                    # Usar label do primeiro mês do trimestre se disponível
+                    if sim.labels_mes and inicio < len(sim.labels_mes):
+                        trim_labels.append(sim.labels_mes[inicio])
+                    else:
+                        trim_labels.append(f"T{t + 1}")
 
                 df_trim = pd.DataFrame({
                     "Trimestre": trim_labels,
@@ -1266,7 +1381,7 @@ elif st.session_state["etapa"] == 3:
 
             # Aplicar edições e simular
             _aplicar_edicoes(resultado, editadas)
-            sim_dfc = simular(resultado)
+            sim_dfc = simular(resultado, datas_macro=st.session_state.get("datas_macro"))
 
             if sim_dfc.vgv <= 0:
                 st.warning("Preencha o VGV estimado para gerar o DFC Aberto.")
@@ -1417,7 +1532,7 @@ elif st.session_state["etapa"] == 4:
             sim_export = st.session_state.get("sim_dfc")
             if sim_export is None:
                 _aplicar_edicoes(resultado, st.session_state.get("premissas_editadas", {}))
-                sim_export = simular(resultado)
+                sim_export = simular(resultado, datas_macro=st.session_state.get("datas_macro"))
             excel_bytes = exportar_excel_bytes(resultado, sim=sim_export)
             st.download_button(
                 "Baixar Excel (.xlsx)",

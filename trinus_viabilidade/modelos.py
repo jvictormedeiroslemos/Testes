@@ -7,6 +7,7 @@ Enums para tipologias, padrões, regiões e dataclasses para inputs/premissas.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from enum import Enum
 from typing import Optional
 
@@ -212,6 +213,61 @@ class TabelaVendasLoteamento:
 
 # Alias para compatibilidade
 TabelaVendas = TabelaVendasIncorporacao
+
+
+@dataclass
+class DatasMacro:
+    """Datas-chave do cronograma macro do empreendimento.
+
+    Todas as datas são representadas como ``date`` (primeiro dia do mês).
+    A partir de ``inicio_projeto`` e dos prazos (registro, obra, etc.)
+    calculamos marcos derivados.
+    """
+    inicio_projeto: date = field(default_factory=lambda: date.today().replace(day=1))
+    inicio_aprovacoes: Optional[date] = None   # Início de projetos/aprovações
+    lancamento: Optional[date] = None          # Data de lançamento comercial
+    inicio_obra: Optional[date] = None         # Início da obra
+    fim_obra: Optional[date] = None            # Conclusão da obra / Habite-se
+    inicio_vendas_pos: Optional[date] = None   # Início das vendas pós-obra
+
+    def sugerir_a_partir_de_premissas(
+        self,
+        prazo_registro_meses: int,
+        prazo_obra_meses: int,
+    ) -> None:
+        """Preenche datas não informadas (None) com base nos prazos."""
+        from dateutil.relativedelta import relativedelta
+
+        base = self.inicio_projeto
+
+        if self.inicio_aprovacoes is None:
+            self.inicio_aprovacoes = base
+
+        if self.lancamento is None:
+            self.lancamento = base + relativedelta(months=prazo_registro_meses)
+
+        if self.inicio_obra is None:
+            self.inicio_obra = self.lancamento
+
+        if self.fim_obra is None:
+            self.fim_obra = self.inicio_obra + relativedelta(months=prazo_obra_meses)
+
+        if self.inicio_vendas_pos is None:
+            self.inicio_vendas_pos = self.fim_obra
+
+    def gerar_labels_mensais(self, total_meses: int) -> list[str]:
+        """Gera labels tipo 'Jan/2026', 'Fev/2026' para cada mês do projeto."""
+        from dateutil.relativedelta import relativedelta
+
+        MESES_PT = [
+            "", "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+            "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+        ]
+        labels: list[str] = []
+        for i in range(total_meses):
+            dt = self.inicio_projeto + relativedelta(months=i)
+            labels.append(f"{MESES_PT[dt.month]}/{dt.year}")
+        return labels
 
 
 @dataclass

@@ -195,7 +195,11 @@ def dfc_aberto_dataframe(sim: "ResultadoSimulacao", e_loteamento: bool = False) 
     from collections import OrderedDict
     cols = OrderedDict()
 
-    cols["Mês"] = list(range(n))
+    # Usar labels de data se disponíveis, senão números
+    if sim.labels_mes and len(sim.labels_mes) >= n:
+        cols["Mês"] = sim.labels_mes[:n]
+    else:
+        cols["Mês"] = list(range(n))
 
     # --- VENDAS ---
     cols["Vendas (unidades)"] = _arr(sim.vendas_unidades_mensal)

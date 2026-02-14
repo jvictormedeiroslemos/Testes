@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from modelos import ResultadoPremissas, Tipologia
+from modelos import ResultadoPremissas, Tipologia, DatasMacro
 from dados_mercado import CURVA_DESEMBOLSO
 
 
@@ -170,6 +170,10 @@ class ResultadoSimulacao:
     atividades_operacionais_mensal: list[float] = field(default_factory=list)
     saldo_caixa_mensal: list[float] = field(default_factory=list)
 
+    # Labels de data por mês (e.g. "Jan/2026", "Fev/2026")
+    labels_mes: list[str] = field(default_factory=list)
+    datas_macro: DatasMacro | None = None
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -248,12 +252,15 @@ def _calcular_vpl(fluxos: list[float], taxa_mensal: float) -> float:
 # ---------------------------------------------------------------------------
 # Motor de simulação
 # ---------------------------------------------------------------------------
-def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
+def simular(resultado: ResultadoPremissas, datas_macro: DatasMacro | None = None) -> ResultadoSimulacao:
     """
     Executa simulação simplificada de DFC mês a mês.
 
     Usa as premissas (já com edições do usuário aplicadas) para projetar
     receitas, custos, despesas e calcular indicadores de viabilidade.
+
+    Se ``datas_macro`` for fornecido, gera labels de data para cada mês
+    (e.g. "Jan/2026") e armazena no resultado.
     """
     sim = ResultadoSimulacao()
     inputs = resultado.inputs
@@ -805,6 +812,14 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     # Lucro sobre investimento (Exposição Máxima)
     if sim.exposicao_maxima < 0:
         sim.lucro_sobre_investimento = (sim.resultado_projeto / abs(sim.exposicao_maxima)) * 100
+
+    # Gerar labels de data se DatasMacro fornecido
+    if datas_macro is not None:
+        sim.datas_macro = datas_macro
+        sim.labels_mes = datas_macro.gerar_labels_mensais(total_meses)
+    else:
+        # Fallback: "Mês 0", "Mês 1", ...
+        sim.labels_mes = [str(m) for m in range(total_meses)]
 
     return sim
 
