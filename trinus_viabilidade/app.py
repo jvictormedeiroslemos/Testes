@@ -620,17 +620,47 @@ elif st.session_state["etapa"] == 3:
 
             dm = st.session_state["datas_macro"]
 
+            # Helper: selectboxes de mês/ano para uma data
+            MESES_NOMES = [
+                "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+                "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+            ]
+            _ano_base = date.today().year
+            ANOS_OPCOES = list(range(_ano_base, _ano_base + 20))
+
+            def _date_selector(label: str, current: date, key_prefix: str, help_text: str = "") -> date:
+                """Renderiza par mês/ano e retorna date correspondente."""
+                st.markdown(f"**{label}**")
+                if help_text:
+                    st.caption(help_text)
+                c_mes, c_ano = st.columns(2)
+                with c_mes:
+                    mes_idx = c_mes.selectbox(
+                        "Mês",
+                        options=list(range(1, 13)),
+                        format_func=lambda x: MESES_NOMES[x - 1],
+                        index=current.month - 1,
+                        key=f"{key_prefix}_mes",
+                        label_visibility="collapsed",
+                    )
+                with c_ano:
+                    ano_val = c_ano.selectbox(
+                        "Ano",
+                        options=ANOS_OPCOES,
+                        index=ANOS_OPCOES.index(current.year) if current.year in ANOS_OPCOES else 0,
+                        key=f"{key_prefix}_ano",
+                        label_visibility="collapsed",
+                    )
+                return date(ano_val, mes_idx, 1)
+
             dm_col1, dm_col2, dm_col3 = st.columns(3)
             with dm_col1:
-                novo_inicio = st.date_input(
-                    "Inicio do Projeto",
-                    value=dm.inicio_projeto,
-                    key="dm_inicio_projeto",
-                    help="Mês/ano de início das atividades (projetos, aprovações).",
-                    format="MM/YYYY",
+                novo_inicio = _date_selector(
+                    "Inicio do Projeto", dm.inicio_projeto, "dm_inicio",
+                    "Mês/ano de início das atividades.",
                 )
-                if isinstance(novo_inicio, date) and novo_inicio != dm.inicio_projeto:
-                    dm.inicio_projeto = novo_inicio.replace(day=1)
+                if novo_inicio != dm.inicio_projeto:
+                    dm.inicio_projeto = novo_inicio
                     # Recalcular sugestões quando início muda
                     dm.inicio_aprovacoes = None
                     dm.lancamento = None
@@ -640,61 +670,40 @@ elif st.session_state["etapa"] == 3:
                     dm.sugerir_a_partir_de_premissas(_prazo_reg, _prazo_obra)
 
             with dm_col2:
-                novo_lanc = st.date_input(
-                    "Lançamento Comercial",
-                    value=dm.lancamento or dm.inicio_projeto,
-                    key="dm_lancamento",
-                    help="Data prevista para o lançamento comercial.",
-                    format="MM/YYYY",
+                novo_lanc = _date_selector(
+                    "Lançamento Comercial", dm.lancamento or dm.inicio_projeto, "dm_lanc",
+                    "Data prevista para lançamento.",
                 )
-                if isinstance(novo_lanc, date):
-                    dm.lancamento = novo_lanc.replace(day=1)
+                dm.lancamento = novo_lanc
 
             with dm_col3:
-                novo_inicio_obra = st.date_input(
-                    "Início da Obra",
-                    value=dm.inicio_obra or dm.lancamento,
-                    key="dm_inicio_obra",
-                    help="Data prevista para início da obra/infraestrutura.",
-                    format="MM/YYYY",
+                novo_inicio_obra = _date_selector(
+                    "Início da Obra", dm.inicio_obra or dm.lancamento, "dm_obra_ini",
+                    "Data prevista para início da obra.",
                 )
-                if isinstance(novo_inicio_obra, date):
-                    dm.inicio_obra = novo_inicio_obra.replace(day=1)
+                dm.inicio_obra = novo_inicio_obra
 
             dm_col4, dm_col5, _ = st.columns(3)
             with dm_col4:
-                novo_fim_obra = st.date_input(
-                    "Conclusão da Obra",
-                    value=dm.fim_obra or dm.inicio_projeto,
-                    key="dm_fim_obra",
-                    help="Data prevista para conclusão da obra / Habite-se.",
-                    format="MM/YYYY",
+                novo_fim_obra = _date_selector(
+                    "Conclusão da Obra", dm.fim_obra or dm.inicio_projeto, "dm_obra_fim",
+                    "Data prevista para habite-se.",
                 )
-                if isinstance(novo_fim_obra, date):
-                    dm.fim_obra = novo_fim_obra.replace(day=1)
+                dm.fim_obra = novo_fim_obra
 
             with dm_col5:
-                novo_pos = st.date_input(
-                    "Início Vendas Pós-Obra",
-                    value=dm.inicio_vendas_pos or dm.fim_obra,
-                    key="dm_vendas_pos",
-                    help="Data de início das vendas residuais pós-obra.",
-                    format="MM/YYYY",
+                novo_pos = _date_selector(
+                    "Início Vendas Pós-Obra", dm.inicio_vendas_pos or dm.fim_obra, "dm_pos",
+                    "Data de início das vendas residuais.",
                 )
-                if isinstance(novo_pos, date):
-                    dm.inicio_vendas_pos = novo_pos.replace(day=1)
+                dm.inicio_vendas_pos = novo_pos
 
             # Resumo visual do cronograma
-            from dateutil.relativedelta import relativedelta
             _meses_ate_lanc = (dm.lancamento.year - dm.inicio_projeto.year) * 12 + (dm.lancamento.month - dm.inicio_projeto.month) if dm.lancamento else _prazo_reg
             _meses_obra = (dm.fim_obra.year - dm.inicio_obra.year) * 12 + (dm.fim_obra.month - dm.inicio_obra.month) if dm.fim_obra and dm.inicio_obra else _prazo_obra
 
-            MESES_PT_FULL = [
-                "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-                "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
-            ]
             def _fmt_data(d: date) -> str:
-                return f"{MESES_PT_FULL[d.month]}/{d.year}"
+                return f"{MESES_NOMES[d.month - 1]}/{d.year}"
 
             st.markdown(
                 f"**Cronograma:** {_fmt_data(dm.inicio_projeto)} → "
