@@ -133,13 +133,43 @@ class CurvaVendas:
 
 
 @dataclass
-class TabelaVendas:
-    """Estrutura da tabela de vendas (condições de pagamento)."""
-    entrada_pct: float  # % do valor na entrada
-    parcelas_obra_pct: float  # % em parcelas durante a obra
-    financiamento_pct: float  # % financiado na entrega das chaves
-    num_parcelas_obra: int  # Quantidade de parcelas durante obra
-    reforcos_pct: float = 0.0  # % em reforços (anuais/semestrais)
+class TabelaVendasIncorporacao:
+    """Tabela de vendas para Incorporação (Vertical, Horizontal, Multi, Mixed Use).
+
+    Modelo: Entrada + Parcelas durante obra + Financiamento bancário na entrega
+    Indexação pré-chaves: INCC | Pós-chaves: IGP-M
+    """
+    entrada_pct: float  # % do valor na entrada (ato + sinal)
+    parcelas_obra_pct: float  # % em mensais durante a obra
+    financiamento_pct: float  # % financiado na entrega das chaves (repasse bancário)
+    reforcos_pct: float  # % em reforços (anuais/semestrais)
+    num_parcelas_obra: int  # Quantidade de parcelas mensais durante obra
+    indexador_pre_chaves: str = "INCC"  # Correção antes da entrega
+    indexador_pos_chaves: str = "IGPM"  # Correção após entrega
+
+
+@dataclass
+class TabelaVendasLoteamento:
+    """Tabela de vendas para Loteamento / Urbanismo.
+
+    Modelo: Entrada (sinal) + Parcelamento longo (Gradiente, Price ou SAC)
+    Parcelas: tipicamente 120x a 240x
+    Juros embutidos: 0,5% a 1,0% a.m. (tabela Price) ou decrescente (Gradiente)
+    Indexação: IPCA ou IGP-M
+    Não há financiamento bancário na entrega (o próprio loteador financia).
+    """
+    entrada_pct: float  # % do valor na entrada (sinal, em 1 a 6 parcelas)
+    saldo_parcelado_pct: float  # % restante parcelado (normalmente 100 - entrada)
+    num_parcelas: int  # Total de parcelas (120, 150, 180, 200, 220, 240)
+    sistema_amortizacao: str  # "Price", "Gradiente" ou "SAC"
+    juros_am: float  # Taxa de juros ao mês (% a.m.) - ex: 0.75
+    indexador: str  # Indexador de correção monetária: "IPCA" ou "IGPM"
+    intermediarias_pct: float = 0.0  # % em parcelas intermediárias (semestrais/anuais)
+    num_parcelas_entrada: int = 3  # Qtd de parcelas para pagar a entrada
+
+
+# Alias para compatibilidade
+TabelaVendas = TabelaVendasIncorporacao
 
 
 @dataclass
@@ -147,7 +177,8 @@ class ResultadoPremissas:
     """Resultado completo com todas as premissas sugeridas."""
     inputs: InputsUsuario
     premissas: list[Premissa] = field(default_factory=list)
-    tabela_vendas: Optional[TabelaVendas] = None
+    tabela_vendas: Optional[TabelaVendasIncorporacao] = None
+    tabela_vendas_loteamento: Optional[TabelaVendasLoteamento] = None
     versao: str = "v1"
 
     def por_categoria(self, categoria: str) -> list[Premissa]:
@@ -160,6 +191,38 @@ class ResultadoPremissas:
         for p in self.premissas:
             if p.nome == nome:
                 return p
+        return None
+
+    @property
+    def e_loteamento(self) -> bool:
+        return self.inputs.tipologia == Tipologia.LOTEAMENTO
+
+    def _tabela_vendas_dict(self) -> dict | None:
+        if self.tabela_vendas_loteamento:
+            tv = self.tabela_vendas_loteamento
+            return {
+                "tipo": "Loteamento",
+                "entrada_pct": tv.entrada_pct,
+                "num_parcelas_entrada": tv.num_parcelas_entrada,
+                "saldo_parcelado_pct": tv.saldo_parcelado_pct,
+                "num_parcelas": tv.num_parcelas,
+                "sistema_amortizacao": tv.sistema_amortizacao,
+                "juros_am": tv.juros_am,
+                "indexador": tv.indexador,
+                "intermediarias_pct": tv.intermediarias_pct,
+            }
+        if self.tabela_vendas:
+            tv = self.tabela_vendas
+            return {
+                "tipo": "Incorporação",
+                "entrada_pct": tv.entrada_pct,
+                "parcelas_obra_pct": tv.parcelas_obra_pct,
+                "financiamento_pct": tv.financiamento_pct,
+                "num_parcelas_obra": tv.num_parcelas_obra,
+                "reforcos_pct": tv.reforcos_pct,
+                "indexador_pre_chaves": tv.indexador_pre_chaves,
+                "indexador_pos_chaves": tv.indexador_pos_chaves,
+            }
         return None
 
     def to_dict(self) -> dict:
@@ -181,13 +244,7 @@ class ResultadoPremissas:
                 "permuta_referencia": self.inputs.permuta_referencia,
                 "valor_aquisicao": self.inputs.valor_aquisicao,
             },
-            "tabela_vendas": {
-                "entrada_pct": self.tabela_vendas.entrada_pct,
-                "parcelas_obra_pct": self.tabela_vendas.parcelas_obra_pct,
-                "financiamento_pct": self.tabela_vendas.financiamento_pct,
-                "num_parcelas_obra": self.tabela_vendas.num_parcelas_obra,
-                "reforcos_pct": self.tabela_vendas.reforcos_pct,
-            } if self.tabela_vendas else None,
+            "tabela_vendas": self._tabela_vendas_dict(),
             "premissas": {
                 cat: [
                     {

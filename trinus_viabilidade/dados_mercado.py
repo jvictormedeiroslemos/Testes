@@ -205,46 +205,175 @@ VELOCIDADE_VENDAS: dict[Tipologia, dict[Padrao, dict]] = {
 # Tabela de vendas típica (condições de pagamento)
 # Referência: Práticas de mercado por tipologia e padrão
 # ==========================================================================
+# ==========================================================================
+# TABELA DE VENDAS - INCORPORAÇÃO (Vertical, Horizontal, Multi, Mixed Use)
+# Modelo: Entrada + Mensais durante obra + Financiamento bancário na entrega
+# Referência: SECOVI, Abrainc, Checklist Viabilidade Trinus
+#
+# Incorporação Econômico (MCMV): Captação ~20% (2% entrada + 18% mensais)
+#   + 80% repasse bancário (CEF). Indexador: INCC pré / sem juros pré.
+# Incorporação Médio-Alto: Entrada 10-30% + Mensais 10-30% + Reforços 5-10%
+#   + Financiamento 30-60%. Indexador: INCC pré / IGP-M pós.
+# ==========================================================================
 TABELA_VENDAS: dict[Tipologia, dict[Padrao, dict]] = {
-    Tipologia.LOTEAMENTO: {
-        Padrao.ECONOMICO:  {"entrada": 10, "parcelas_obra": 60, "financiamento": 30, "reforcos": 0, "num_parcelas": 120},
-        Padrao.STANDARD:   {"entrada": 10, "parcelas_obra": 55, "financiamento": 30, "reforcos": 5, "num_parcelas": 100},
-        Padrao.MEDIO:      {"entrada": 15, "parcelas_obra": 50, "financiamento": 30, "reforcos": 5, "num_parcelas": 80},
-        Padrao.MEDIO_ALTO: {"entrada": 20, "parcelas_obra": 45, "financiamento": 30, "reforcos": 5, "num_parcelas": 60},
-        Padrao.ALTO:       {"entrada": 20, "parcelas_obra": 40, "financiamento": 30, "reforcos": 10, "num_parcelas": 48},
-        Padrao.LUXO:       {"entrada": 30, "parcelas_obra": 35, "financiamento": 25, "reforcos": 10, "num_parcelas": 36},
-    },
     Tipologia.INCORPORACAO_VERTICAL: {
-        Padrao.ECONOMICO:  {"entrada": 10, "parcelas_obra": 20, "financiamento": 70, "reforcos": 0, "num_parcelas": 30},
-        Padrao.STANDARD:   {"entrada": 15, "parcelas_obra": 20, "financiamento": 60, "reforcos": 5, "num_parcelas": 30},
-        Padrao.MEDIO:      {"entrada": 20, "parcelas_obra": 20, "financiamento": 50, "reforcos": 10, "num_parcelas": 30},
-        Padrao.MEDIO_ALTO: {"entrada": 20, "parcelas_obra": 25, "financiamento": 45, "reforcos": 10, "num_parcelas": 36},
-        Padrao.ALTO:       {"entrada": 25, "parcelas_obra": 30, "financiamento": 35, "reforcos": 10, "num_parcelas": 36},
-        Padrao.LUXO:       {"entrada": 30, "parcelas_obra": 35, "financiamento": 25, "reforcos": 10, "num_parcelas": 36},
+        Padrao.ECONOMICO:  {"entrada": 2,  "parcelas_obra": 18, "financiamento": 80, "reforcos": 0,  "num_parcelas": 30},
+        Padrao.STANDARD:   {"entrada": 10, "parcelas_obra": 20, "financiamento": 65, "reforcos": 5,  "num_parcelas": 30},
+        Padrao.MEDIO:      {"entrada": 15, "parcelas_obra": 20, "financiamento": 55, "reforcos": 10, "num_parcelas": 30},
+        Padrao.MEDIO_ALTO: {"entrada": 20, "parcelas_obra": 20, "financiamento": 50, "reforcos": 10, "num_parcelas": 36},
+        Padrao.ALTO:       {"entrada": 25, "parcelas_obra": 25, "financiamento": 40, "reforcos": 10, "num_parcelas": 36},
+        Padrao.LUXO:       {"entrada": 30, "parcelas_obra": 30, "financiamento": 30, "reforcos": 10, "num_parcelas": 36},
     },
     Tipologia.INCORPORACAO_HORIZONTAL: {
-        Padrao.ECONOMICO:  {"entrada": 10, "parcelas_obra": 20, "financiamento": 70, "reforcos": 0, "num_parcelas": 24},
-        Padrao.STANDARD:   {"entrada": 15, "parcelas_obra": 20, "financiamento": 60, "reforcos": 5, "num_parcelas": 24},
-        Padrao.MEDIO:      {"entrada": 20, "parcelas_obra": 25, "financiamento": 50, "reforcos": 5, "num_parcelas": 24},
+        Padrao.ECONOMICO:  {"entrada": 2,  "parcelas_obra": 18, "financiamento": 80, "reforcos": 0,  "num_parcelas": 24},
+        Padrao.STANDARD:   {"entrada": 10, "parcelas_obra": 20, "financiamento": 65, "reforcos": 5,  "num_parcelas": 24},
+        Padrao.MEDIO:      {"entrada": 15, "parcelas_obra": 25, "financiamento": 50, "reforcos": 10, "num_parcelas": 24},
         Padrao.MEDIO_ALTO: {"entrada": 20, "parcelas_obra": 25, "financiamento": 45, "reforcos": 10, "num_parcelas": 30},
         Padrao.ALTO:       {"entrada": 25, "parcelas_obra": 30, "financiamento": 35, "reforcos": 10, "num_parcelas": 30},
-        Padrao.LUXO:       {"entrada": 30, "parcelas_obra": 35, "financiamento": 25, "reforcos": 10, "num_parcelas": 30},
+        Padrao.LUXO:       {"entrada": 30, "parcelas_obra": 30, "financiamento": 30, "reforcos": 10, "num_parcelas": 30},
     },
     Tipologia.MULTIPROPRIEDADE: {
-        Padrao.ECONOMICO:  {"entrada": 10, "parcelas_obra": 50, "financiamento": 40, "reforcos": 0, "num_parcelas": 48},
-        Padrao.STANDARD:   {"entrada": 15, "parcelas_obra": 45, "financiamento": 35, "reforcos": 5, "num_parcelas": 48},
-        Padrao.MEDIO:      {"entrada": 15, "parcelas_obra": 45, "financiamento": 35, "reforcos": 5, "num_parcelas": 60},
+        Padrao.ECONOMICO:  {"entrada": 10, "parcelas_obra": 50, "financiamento": 40, "reforcos": 0,  "num_parcelas": 48},
+        Padrao.STANDARD:   {"entrada": 15, "parcelas_obra": 45, "financiamento": 35, "reforcos": 5,  "num_parcelas": 48},
+        Padrao.MEDIO:      {"entrada": 15, "parcelas_obra": 45, "financiamento": 35, "reforcos": 5,  "num_parcelas": 60},
         Padrao.MEDIO_ALTO: {"entrada": 20, "parcelas_obra": 40, "financiamento": 30, "reforcos": 10, "num_parcelas": 60},
         Padrao.ALTO:       {"entrada": 25, "parcelas_obra": 35, "financiamento": 30, "reforcos": 10, "num_parcelas": 48},
         Padrao.LUXO:       {"entrada": 30, "parcelas_obra": 30, "financiamento": 25, "reforcos": 15, "num_parcelas": 36},
     },
     Tipologia.MIXED_USE: {
-        Padrao.ECONOMICO:  {"entrada": 10, "parcelas_obra": 25, "financiamento": 65, "reforcos": 0, "num_parcelas": 30},
-        Padrao.STANDARD:   {"entrada": 15, "parcelas_obra": 25, "financiamento": 55, "reforcos": 5, "num_parcelas": 30},
-        Padrao.MEDIO:      {"entrada": 20, "parcelas_obra": 25, "financiamento": 45, "reforcos": 10, "num_parcelas": 30},
+        Padrao.ECONOMICO:  {"entrada": 5,  "parcelas_obra": 25, "financiamento": 70, "reforcos": 0,  "num_parcelas": 30},
+        Padrao.STANDARD:   {"entrada": 10, "parcelas_obra": 25, "financiamento": 60, "reforcos": 5,  "num_parcelas": 30},
+        Padrao.MEDIO:      {"entrada": 15, "parcelas_obra": 25, "financiamento": 50, "reforcos": 10, "num_parcelas": 30},
         Padrao.MEDIO_ALTO: {"entrada": 20, "parcelas_obra": 25, "financiamento": 45, "reforcos": 10, "num_parcelas": 36},
-        Padrao.ALTO:       {"entrada": 25, "parcelas_obra": 30, "financiamento": 35, "reforcos": 10, "num_parcelas": 36},
+        Padrao.ALTO:       {"entrada": 25, "parcelas_obra": 25, "financiamento": 40, "reforcos": 10, "num_parcelas": 36},
         Padrao.LUXO:       {"entrada": 30, "parcelas_obra": 30, "financiamento": 25, "reforcos": 15, "num_parcelas": 36},
+    },
+}
+
+
+# ==========================================================================
+# TABELA DE VENDAS - LOTEAMENTO / URBANISMO
+# Modelo completamente diferente da Incorporação:
+#   - Entrada (sinal) em 1 a 6 parcelas
+#   - Saldo parcelado em 120x a 240x (Price, Gradiente ou SAC)
+#   - Juros embutidos: 0,5% a 1,0% a.m.
+#   - Não há financiamento bancário na entrega (loteador financia direto)
+#   - Indexação: IPCA ou IGP-M
+#   - Pode ter intermediárias (semestrais/anuais)
+#
+# Referência: AELO, SECOVI, Checklist Viabilidade Trinus (Urbanismo),
+#   práticas de mercado de loteamentos 2024/2025
+# ==========================================================================
+TABELA_VENDAS_LOTEAMENTO: dict[Padrao, dict] = {
+    Padrao.ECONOMICO: {
+        "entrada_pct": 5,
+        "saldo_parcelado_pct": 95,
+        "num_parcelas": 200,
+        "sistema_amortizacao": "Price",
+        "juros_am": 0.65,
+        "indexador": "IPCA",
+        "intermediarias_pct": 0,
+        "num_parcelas_entrada": 6,
+    },
+    Padrao.STANDARD: {
+        "entrada_pct": 8,
+        "saldo_parcelado_pct": 92,
+        "num_parcelas": 180,
+        "sistema_amortizacao": "Price",
+        "juros_am": 0.75,
+        "indexador": "IPCA",
+        "intermediarias_pct": 0,
+        "num_parcelas_entrada": 4,
+    },
+    Padrao.MEDIO: {
+        "entrada_pct": 10,
+        "saldo_parcelado_pct": 85,
+        "num_parcelas": 180,
+        "sistema_amortizacao": "Price",
+        "juros_am": 0.80,
+        "indexador": "IPCA",
+        "intermediarias_pct": 5,
+        "num_parcelas_entrada": 3,
+    },
+    Padrao.MEDIO_ALTO: {
+        "entrada_pct": 10,
+        "saldo_parcelado_pct": 82,
+        "num_parcelas": 150,
+        "sistema_amortizacao": "Price",
+        "juros_am": 0.85,
+        "indexador": "IPCA",
+        "intermediarias_pct": 8,
+        "num_parcelas_entrada": 3,
+    },
+    Padrao.ALTO: {
+        "entrada_pct": 15,
+        "saldo_parcelado_pct": 75,
+        "num_parcelas": 120,
+        "sistema_amortizacao": "Gradiente",
+        "juros_am": 0.90,
+        "indexador": "IGPM",
+        "intermediarias_pct": 10,
+        "num_parcelas_entrada": 3,
+    },
+    Padrao.LUXO: {
+        "entrada_pct": 20,
+        "saldo_parcelado_pct": 70,
+        "num_parcelas": 120,
+        "sistema_amortizacao": "Gradiente",
+        "juros_am": 1.0,
+        "indexador": "IGPM",
+        "intermediarias_pct": 10,
+        "num_parcelas_entrada": 3,
+    },
+}
+
+
+# ==========================================================================
+# Regime tributário sugerido POR TIPOLOGIA
+# Loteamento: Lucro Presumido (6.73%) - padrão do setor
+# Incorporação: RET (4%) ou RET-MCMV (1%)
+# Referência: RFB, AELO, SECOVI, Checklist Viabilidade Trinus
+# ==========================================================================
+REGIME_SUGERIDO_POR_TIPOLOGIA: dict[Tipologia, dict[Padrao, str]] = {
+    Tipologia.LOTEAMENTO: {
+        Padrao.ECONOMICO:  "LUCRO_PRESUMIDO",
+        Padrao.STANDARD:   "LUCRO_PRESUMIDO",
+        Padrao.MEDIO:      "LUCRO_PRESUMIDO",
+        Padrao.MEDIO_ALTO: "LUCRO_PRESUMIDO",
+        Padrao.ALTO:       "LUCRO_PRESUMIDO",
+        Padrao.LUXO:       "LUCRO_PRESUMIDO",
+    },
+    Tipologia.INCORPORACAO_VERTICAL: {
+        Padrao.ECONOMICO:  "RET_MCMV",
+        Padrao.STANDARD:   "RET",
+        Padrao.MEDIO:      "RET",
+        Padrao.MEDIO_ALTO: "RET",
+        Padrao.ALTO:       "RET",
+        Padrao.LUXO:       "LUCRO_PRESUMIDO",
+    },
+    Tipologia.INCORPORACAO_HORIZONTAL: {
+        Padrao.ECONOMICO:  "RET_MCMV",
+        Padrao.STANDARD:   "RET",
+        Padrao.MEDIO:      "RET",
+        Padrao.MEDIO_ALTO: "RET",
+        Padrao.ALTO:       "RET",
+        Padrao.LUXO:       "LUCRO_PRESUMIDO",
+    },
+    Tipologia.MULTIPROPRIEDADE: {
+        Padrao.ECONOMICO:  "RET",
+        Padrao.STANDARD:   "RET",
+        Padrao.MEDIO:      "RET",
+        Padrao.MEDIO_ALTO: "RET",
+        Padrao.ALTO:       "LUCRO_PRESUMIDO",
+        Padrao.LUXO:       "LUCRO_PRESUMIDO",
+    },
+    Tipologia.MIXED_USE: {
+        Padrao.ECONOMICO:  "RET",
+        Padrao.STANDARD:   "RET",
+        Padrao.MEDIO:      "RET",
+        Padrao.MEDIO_ALTO: "RET",
+        Padrao.ALTO:       "LUCRO_PRESUMIDO",
+        Padrao.LUXO:       "LUCRO_PRESUMIDO",
     },
 }
 

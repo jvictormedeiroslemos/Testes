@@ -611,18 +611,70 @@ elif st.session_state["etapa"] == 3:
 
         # --- Tabela de vendas ---
         with tab_vendas:
-            st.subheader("Condições de Pagamento (Tabela de Vendas)")
-            if resultado.tabela_vendas:
+            if resultado.tabela_vendas_loteamento:
+                # ========= LOTEAMENTO =========
+                tv = resultado.tabela_vendas_loteamento
+                st.subheader("Tabela de Vendas — Loteamento")
+                st.markdown(
+                    "Modelo de **parcelamento direto** pelo loteador. "
+                    "Não há financiamento bancário na entrega das chaves."
+                )
+
+                col1, col2, col3 = st.columns(3)
+                col1.metric("Entrada", f"{tv.entrada_pct}%",
+                            help=f"Em {tv.num_parcelas_entrada} parcelas")
+                col2.metric("Saldo Parcelado", f"{tv.saldo_parcelado_pct}%",
+                            help=f"Em {tv.num_parcelas}x ({tv.sistema_amortizacao})")
+                col3.metric("Intermediárias", f"{tv.intermediarias_pct}%",
+                            help="Parcelas semestrais/anuais")
+
+                st.markdown("---")
+                st.markdown("**Detalhes do Parcelamento:**")
+                det_col1, det_col2 = st.columns(2)
+                with det_col1:
+                    st.markdown(f"- **Nº de parcelas:** {tv.num_parcelas}x")
+                    st.markdown(f"- **Sistema de amortização:** {tv.sistema_amortizacao}")
+                    st.markdown(f"- **Parcelas da entrada:** {tv.num_parcelas_entrada}x")
+                with det_col2:
+                    juros_aa = round(((1 + tv.juros_am / 100) ** 12 - 1) * 100, 2)
+                    st.markdown(f"- **Juros:** {tv.juros_am}% a.m. ({juros_aa}% a.a.)")
+                    st.markdown(f"- **Indexador:** {tv.indexador}")
+
+                st.info(
+                    "Em loteamentos, o incorporador/loteador financia diretamente o comprador. "
+                    "As tabelas mais comuns são **Price** (parcelas fixas + correção) e "
+                    "**Gradiente** (parcelas crescentes). Prazos de **120x a 240x** são o padrão."
+                )
+
+                df_vendas = tabela_vendas_para_dataframe(resultado)
+                if not df_vendas.empty:
+                    st.dataframe(df_vendas, use_container_width=True, hide_index=True)
+
+            elif resultado.tabela_vendas:
+                # ========= INCORPORAÇÃO =========
+                tv = resultado.tabela_vendas
+                st.subheader("Tabela de Vendas — Incorporação")
+                st.markdown(
+                    "Modelo de **captação + financiamento bancário** na entrega das chaves. "
+                    f"Indexação: **{tv.indexador_pre_chaves}** (pré-chaves) / "
+                    f"**{tv.indexador_pos_chaves}** (pós-chaves)."
+                )
+
                 df_vendas = tabela_vendas_para_dataframe(resultado)
                 st.dataframe(df_vendas, use_container_width=True, hide_index=True)
 
-                tv = resultado.tabela_vendas
                 st.markdown("**Distribuição visual:**")
                 cols_tv = st.columns(4)
                 cols_tv[0].metric("Entrada", f"{tv.entrada_pct}%")
-                cols_tv[1].metric("Parcelas Obra", f"{tv.parcelas_obra_pct}%")
-                cols_tv[2].metric("Financiamento", f"{tv.financiamento_pct}%")
-                cols_tv[3].metric("Reforços", f"{tv.reforcos_pct}%")
+                cols_tv[1].metric("Parcelas Obra", f"{tv.parcelas_obra_pct}%",
+                                  help=f"{tv.num_parcelas_obra} parcelas mensais")
+                cols_tv[2].metric("Financiamento", f"{tv.financiamento_pct}%",
+                                  help="Repasse bancário na entrega das chaves")
+                cols_tv[3].metric("Reforços", f"{tv.reforcos_pct}%",
+                                  help="Parcelas semestrais/anuais")
+
+            else:
+                st.warning("Nenhuma tabela de vendas disponível.")
 
         # --- Resumo DFC ---
         with tab_resumo_dfc:

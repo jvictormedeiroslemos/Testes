@@ -71,16 +71,34 @@ def _inputs_para_dataframe(resultado: ResultadoPremissas) -> pd.DataFrame:
 
 
 def _tabela_vendas_para_dataframe(resultado: ResultadoPremissas) -> pd.DataFrame:
-    """Converte tabela de vendas para DataFrame."""
+    """Converte tabela de vendas para DataFrame (Loteamento ou Incorporação)."""
+    # Loteamento
+    if resultado.tabela_vendas_loteamento:
+        tv = resultado.tabela_vendas_loteamento
+        rows = [
+            {"Condição": "Entrada", "Valor": f"{tv.entrada_pct}%"},
+            {"Condição": "Nº parcelas da entrada", "Valor": tv.num_parcelas_entrada},
+            {"Condição": "Saldo parcelado", "Valor": f"{tv.saldo_parcelado_pct}%"},
+            {"Condição": "Nº parcelas", "Valor": tv.num_parcelas},
+            {"Condição": "Sistema de amortização", "Valor": tv.sistema_amortizacao},
+            {"Condição": "Juros (% a.m.)", "Valor": f"{tv.juros_am}%"},
+            {"Condição": "Indexador", "Valor": tv.indexador},
+            {"Condição": "Intermediárias", "Valor": f"{tv.intermediarias_pct}%"},
+        ]
+        return pd.DataFrame(rows)
+
+    # Incorporação
     tv = resultado.tabela_vendas
     if not tv:
         return pd.DataFrame()
     rows = [
-        {"Condição": "Entrada", "Percentual (%)": tv.entrada_pct},
-        {"Condição": "Parcelas durante obra", "Percentual (%)": tv.parcelas_obra_pct},
-        {"Condição": "Financiamento (chaves)", "Percentual (%)": tv.financiamento_pct},
-        {"Condição": "Reforços", "Percentual (%)": tv.reforcos_pct},
-        {"Condição": "Nº parcelas durante obra", "Percentual (%)": tv.num_parcelas_obra},
+        {"Condição": "Entrada", "Valor": f"{tv.entrada_pct}%"},
+        {"Condição": "Parcelas durante obra", "Valor": f"{tv.parcelas_obra_pct}%"},
+        {"Condição": "Financiamento (chaves)", "Valor": f"{tv.financiamento_pct}%"},
+        {"Condição": "Reforços", "Valor": f"{tv.reforcos_pct}%"},
+        {"Condição": "Nº parcelas durante obra", "Valor": tv.num_parcelas_obra},
+        {"Condição": "Indexador pré-chaves", "Valor": tv.indexador_pre_chaves},
+        {"Condição": "Indexador pós-chaves", "Valor": tv.indexador_pos_chaves},
     ]
     return pd.DataFrame(rows)
 

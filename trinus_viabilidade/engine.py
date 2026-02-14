@@ -12,7 +12,8 @@ from modelos import (
     Padrao,
     Premissa,
     ResultadoPremissas,
-    TabelaVendas,
+    TabelaVendasIncorporacao,
+    TabelaVendasLoteamento,
     Tipologia,
     TipoNegociacao,
 )
@@ -43,13 +44,22 @@ from dados_mercado import (
     PREMIACAO_CORRETORES,
     PREMISSAS_CRI,
     PREMISSAS_FINANCEIRAS,
-    REGIME_SUGERIDO,
+    REGIME_SUGERIDO_POR_TIPOLOGIA,
     SEGUROS,
     TABELA_VENDAS,
+    TABELA_VENDAS_LOTEAMENTO,
     TAXA_GESTAO,
     TAXAS_CARTORARIAS,
     VELOCIDADE_VENDAS,
 )
+
+# Tipologias que usam o modelo de Incorporação (CRI, financiamento à produção, etc.)
+_TIPOLOGIAS_INCORPORACAO = {
+    Tipologia.INCORPORACAO_VERTICAL,
+    Tipologia.INCORPORACAO_HORIZONTAL,
+    Tipologia.MULTIPROPRIEDADE,
+    Tipologia.MIXED_USE,
+}
 
 
 def gerar_premissas(inputs: InputsUsuario) -> ResultadoPremissas:
@@ -570,19 +580,33 @@ def _gerar_premissas_despesa(
         descricao="Constituição da SPE, registros iniciais e despesas pré-operacionais",
     ))
 
-    # Despesas tributárias
-    regime_key = REGIME_SUGERIDO[inputs.padrao]
+    # Despesas tributárias (por tipologia)
+    regime_key = REGIME_SUGERIDO_POR_TIPOLOGIA[inputs.tipologia][inputs.padrao]
     regime_info = ALIQUOTAS_TRIBUTARIAS[regime_key]
+    e_loteamento = inputs.tipologia == Tipologia.LOTEAMENTO
+
+    if e_loteamento:
+        descricao_trib = (
+            f"{regime_info['descricao']} — Loteamentos utilizam "
+            f"predominantemente Lucro Presumido"
+        )
+        valor_min_trib = 5.93
+        valor_max_trib = 6.73
+    else:
+        descricao_trib = regime_info["descricao"]
+        valor_min_trib = 1.0
+        valor_max_trib = 6.73
+
     resultado.premissas.append(Premissa(
         nome="Alíquota tributária (regime sugerido)",
         valor=regime_info["aliquota"],
         unidade="% sobre receita",
-        valor_min=1.0,
-        valor_max=6.73,
+        valor_min=valor_min_trib,
+        valor_max=valor_max_trib,
         fonte=regime_info["fonte"],
         categoria="Despesa",
         subcategoria="Tributária",
-        descricao=f"{regime_info['descricao']}",
+        descricao=descricao_trib,
     ))
 
     # Taxas cartoriais
@@ -602,27 +626,19 @@ def _gerar_premissas_despesa(
 
 
 def _gerar_premissas_financeiras(resultado: ResultadoPremissas):
-    """Gera premissas da categoria Financeiro."""
-    mapeamento = {
+    """Gera premissas da categoria Financeiro, condicionais por tipologia."""
+    inputs = resultado.inputs
+    e_incorporacao = inputs.tipologia in _TIPOLOGIAS_INCORPORACAO
+    e_loteamento = inputs.tipologia == Tipologia.LOTEAMENTO
+
+    # --- Premissas comuns a todas as tipologias ---
+    premissas_comuns = {
         "tma": ("Taxa Mínima de Atratividade (TMA)", "Taxa de Desconto"),
-        "incc": ("INCC (projeção anual)", "Índices"),
         "ipca": ("IPCA (projeção anual)", "Índices"),
         "igpm": ("IGP-M (projeção anual)", "Índices"),
-        "financiamento_producao_taxa": (
-            "Financiamento à produção - Taxa", "Financiamento"
-        ),
-        "financiamento_producao_carencia": (
-            "Financiamento à produção - Carência", "Financiamento"
-        ),
-        "financiamento_producao_prazo": (
-            "Financiamento à produção - Prazo", "Financiamento"
-        ),
-        "financiamento_producao_pct_custo": (
-            "Financiamento à produção - % Custo financiado", "Financiamento"
-        ),
     }
 
-    for chave, (nome, subcat) in mapeamento.items():
+    for chave, (nome, subcat) in premissas_comuns.items():
         ref = PREMISSAS_FINANCEIRAS[chave]
         resultado.premissas.append(Premissa(
             nome=nome,
@@ -636,26 +652,98 @@ def _gerar_premissas_financeiras(resultado: ResultadoPremissas):
             descricao=ref["descricao"],
         ))
 
-    # Premissas CRI
-    mapeamento_cri = {
-        "taxa_cdi_spread": ("CRI - Spread sobre CDI", "CRI"),
-        "taxa_ipca_spread": ("CRI - Spread sobre IPCA", "CRI"),
-        "prazo_operacao": ("CRI - Prazo da operação", "CRI"),
-        "custo_emissao": ("CRI - Custos de emissão", "CRI"),
-    }
-
-    for chave, (nome, subcat) in mapeamento_cri.items():
-        ref = PREMISSAS_CRI[chave]
+    # --- INCC: relevante para Incorporação (indexador pré-chaves) ---
+    if e_incorporacao:
+        ref_incc = PREMISSAS_FINANCEIRAS["incc"]
         resultado.premissas.append(Premissa(
-            nome=nome,
-            valor=ref["medio"],
-            unidade=ref["unidade"],
-            valor_min=ref["min"],
-            valor_max=ref["max"],
-            fonte=ref["fonte"],
+            nome="INCC (projeção anual)",
+            valor=ref_incc["medio"],
+            unidade=ref_incc["unidade"],
+            valor_min=ref_incc["min"],
+            valor_max=ref_incc["max"],
+            fonte=ref_incc["fonte"],
             categoria="Financeiro",
-            subcategoria=subcat,
-            descricao=ref["descricao"],
+            subcategoria="Índices",
+            descricao=f"{ref_incc['descricao']} — Indexador pré-chaves para incorporação",
+        ))
+
+    # --- Financiamento à produção: apenas Incorporação ---
+    if e_incorporacao:
+        premissas_fin_prod = {
+            "financiamento_producao_taxa": (
+                "Financiamento à produção - Taxa", "Financiamento à Produção"
+            ),
+            "financiamento_producao_carencia": (
+                "Financiamento à produção - Carência", "Financiamento à Produção"
+            ),
+            "financiamento_producao_prazo": (
+                "Financiamento à produção - Prazo", "Financiamento à Produção"
+            ),
+            "financiamento_producao_pct_custo": (
+                "Financiamento à produção - % Custo financiado", "Financiamento à Produção"
+            ),
+        }
+        for chave, (nome, subcat) in premissas_fin_prod.items():
+            ref = PREMISSAS_FINANCEIRAS[chave]
+            resultado.premissas.append(Premissa(
+                nome=nome,
+                valor=ref["medio"],
+                unidade=ref["unidade"],
+                valor_min=ref["min"],
+                valor_max=ref["max"],
+                fonte=ref["fonte"],
+                categoria="Financeiro",
+                subcategoria=subcat,
+                descricao=ref["descricao"],
+            ))
+
+    # --- CRI: apenas Incorporação (securitização de recebíveis) ---
+    if e_incorporacao:
+        mapeamento_cri = {
+            "taxa_cdi_spread": ("CRI - Spread sobre CDI", "CRI"),
+            "taxa_ipca_spread": ("CRI - Spread sobre IPCA", "CRI"),
+            "prazo_operacao": ("CRI - Prazo da operação", "CRI"),
+            "custo_emissao": ("CRI - Custos de emissão", "CRI"),
+        }
+        for chave, (nome, subcat) in mapeamento_cri.items():
+            ref = PREMISSAS_CRI[chave]
+            resultado.premissas.append(Premissa(
+                nome=nome,
+                valor=ref["medio"],
+                unidade=ref["unidade"],
+                valor_min=ref["min"],
+                valor_max=ref["max"],
+                fonte=ref["fonte"],
+                categoria="Financeiro",
+                subcategoria=subcat,
+                descricao=ref["descricao"],
+            ))
+
+    # --- Loteamento: Juros sobre carteira de recebíveis ---
+    if e_loteamento:
+        ref_tv = TABELA_VENDAS_LOTEAMENTO[inputs.padrao]
+        resultado.premissas.append(Premissa(
+            nome="Juros sobre carteira de recebíveis",
+            valor=ref_tv["juros_am"],
+            unidade="% a.m.",
+            valor_min=0.50,
+            valor_max=1.00,
+            fonte="AELO, práticas de mercado de loteamentos",
+            categoria="Financeiro",
+            subcategoria="Carteira de Recebíveis",
+            descricao="Taxa de juros mensal embutida nas parcelas do loteamento (Price/Gradiente)",
+        ))
+        resultado.premissas.append(Premissa(
+            nome="Juros sobre carteira (equivalente anual)",
+            valor=round(((1 + ref_tv["juros_am"] / 100) ** 12 - 1) * 100, 2),
+            unidade="% a.a.",
+            valor_min=round(((1 + 0.50 / 100) ** 12 - 1) * 100, 2),
+            valor_max=round(((1 + 1.00 / 100) ** 12 - 1) * 100, 2),
+            fonte="Calculado: (1 + juros_mensal)^12 - 1",
+            categoria="Financeiro",
+            subcategoria="Carteira de Recebíveis",
+            descricao="Equivalente anual da taxa de juros sobre as parcelas",
+            editavel=False,
         ))
 
 
@@ -663,12 +751,27 @@ def _gerar_tabela_vendas(
     resultado: ResultadoPremissas,
     inputs: InputsUsuario,
 ):
-    """Gera a tabela de condições de vendas."""
-    ref = TABELA_VENDAS[inputs.tipologia][inputs.padrao]
-    resultado.tabela_vendas = TabelaVendas(
-        entrada_pct=ref["entrada"],
-        parcelas_obra_pct=ref["parcelas_obra"],
-        financiamento_pct=ref["financiamento"],
-        reforcos_pct=ref["reforcos"],
-        num_parcelas_obra=ref["num_parcelas"],
-    )
+    """Gera a tabela de condições de vendas, diferenciada por tipologia."""
+    if inputs.tipologia == Tipologia.LOTEAMENTO:
+        # Tabela de Loteamento: Entrada + Parcelamento longo (Price/Gradiente)
+        ref = TABELA_VENDAS_LOTEAMENTO[inputs.padrao]
+        resultado.tabela_vendas_loteamento = TabelaVendasLoteamento(
+            entrada_pct=ref["entrada_pct"],
+            saldo_parcelado_pct=ref["saldo_parcelado_pct"],
+            num_parcelas=ref["num_parcelas"],
+            sistema_amortizacao=ref["sistema_amortizacao"],
+            juros_am=ref["juros_am"],
+            indexador=ref["indexador"],
+            intermediarias_pct=ref["intermediarias_pct"],
+            num_parcelas_entrada=ref["num_parcelas_entrada"],
+        )
+    else:
+        # Tabela de Incorporação: Entrada + Obra + Financiamento na entrega
+        ref = TABELA_VENDAS[inputs.tipologia][inputs.padrao]
+        resultado.tabela_vendas = TabelaVendasIncorporacao(
+            entrada_pct=ref["entrada"],
+            parcelas_obra_pct=ref["parcelas_obra"],
+            financiamento_pct=ref["financiamento"],
+            reforcos_pct=ref["reforcos"],
+            num_parcelas_obra=ref["num_parcelas"],
+        )
