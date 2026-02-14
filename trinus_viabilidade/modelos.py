@@ -85,6 +85,48 @@ ESTADOS_BRASIL: list[str] = sorted(ESTADO_PARA_REGIAO.keys())
 
 
 # ---------------------------------------------------------------------------
+# Padrões válidos por tipologia
+# Nem todos os padrões fazem sentido para todas as tipologias.
+# ---------------------------------------------------------------------------
+PADROES_POR_TIPOLOGIA: dict[Tipologia, list[Padrao]] = {
+    Tipologia.LOTEAMENTO: [
+        Padrao.ECONOMICO,
+        Padrao.STANDARD,
+        Padrao.MEDIO,
+        Padrao.MEDIO_ALTO,
+        Padrao.ALTO,
+    ],
+    Tipologia.INCORPORACAO_VERTICAL: [
+        Padrao.ECONOMICO,
+        Padrao.STANDARD,
+        Padrao.MEDIO,
+        Padrao.MEDIO_ALTO,
+        Padrao.ALTO,
+        Padrao.LUXO,
+    ],
+    Tipologia.INCORPORACAO_HORIZONTAL: [
+        Padrao.ECONOMICO,
+        Padrao.STANDARD,
+        Padrao.MEDIO,
+        Padrao.MEDIO_ALTO,
+        Padrao.ALTO,
+    ],
+    Tipologia.MULTIPROPRIEDADE: [
+        Padrao.MEDIO,
+        Padrao.MEDIO_ALTO,
+        Padrao.ALTO,
+        Padrao.LUXO,
+    ],
+    Tipologia.MIXED_USE: [
+        Padrao.STANDARD,
+        Padrao.MEDIO,
+        Padrao.MEDIO_ALTO,
+        Padrao.ALTO,
+    ],
+}
+
+
+# ---------------------------------------------------------------------------
 # Dataclasses
 # ---------------------------------------------------------------------------
 @dataclass

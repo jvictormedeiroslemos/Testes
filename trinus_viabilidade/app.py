@@ -18,6 +18,7 @@ import streamlit as st
 
 from modelos import (
     ESTADOS_BRASIL,
+    PADROES_POR_TIPOLOGIA,
     InputsUsuario,
     Padrao,
     Tipologia,
@@ -252,11 +253,15 @@ if st.session_state["etapa"] == 1:
             help="Tipo de produto imobiliário",
         )
 
+        # Filtrar padrões válidos para a tipologia selecionada
+        tipologia_enum = Tipologia(tipologia)
+        padroes_validos = PADROES_POR_TIPOLOGIA[tipologia_enum]
+
         padrao = st.selectbox(
             "Padrão do empreendimento *",
-            options=[p.value for p in Padrao],
+            options=[p.value for p in padroes_validos],
             key="inp_padrao",
-            help="Define o nível de acabamento e público-alvo",
+            help="Define o nível de acabamento e público-alvo (filtrado pela tipologia)",
         )
 
         num_unidades = st.number_input(
