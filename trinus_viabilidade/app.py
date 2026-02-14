@@ -939,10 +939,10 @@ elif st.session_state["etapa"] == 3:
                 st.markdown("### Fluxo de Caixa do Projeto")
 
                 def _fmt(v: float) -> str:
-                    """Formata valor monetário."""
+                    """Formata valor monetário (padrão brasileiro)."""
                     if v == 0:
                         return "-"
-                    return f"R$ {v:,.0f}"
+                    return f"R$ {v:,.0f}".replace(",", ".")
 
                 def _pct(v: float, base: float) -> str:
                     """Calcula e formata percentual."""
@@ -974,10 +974,6 @@ elif st.session_state["etapa"] == 3:
                     (2, "Parcelas mensais", _fmt(sim.receita_parcelas), _pct(sim.receita_parcelas, rl), _pct(sim.receita_parcelas, v)),
                     (2, lbl_inter, _fmt(sim.receita_intermediarias), _pct(sim.receita_intermediarias, rl), _pct(sim.receita_intermediarias, v)),
                     (1, "(-) Inadimplência", _fmt(-sim.valor_inadimplencia), _pct(-sim.valor_inadimplencia, rl), _pct(-sim.valor_inadimplencia, v)),
-                    (0, "", "", "", ""),
-                    # --- DEDUTORES ---
-                    (0, "(-) DEDUTORES DE RECEITA", _fmt(-sim.impostos_total), _pct(-sim.impostos_total, rl), _pct(-sim.impostos_total, v)),
-                    (1, "Impostos sobre receita", _fmt(-sim.impostos_total), _pct(-sim.impostos_total, rl), _pct(-sim.impostos_total, v)),
                     (0, "", "", "", ""),
                     # --- CUSTOS ---
                     (0, "(-) CUSTOS", _fmt(-sim.custo_total), _pct(-sim.custo_total, rl), _pct(-sim.custo_total, v)),

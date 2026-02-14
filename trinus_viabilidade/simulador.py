@@ -355,10 +355,10 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     # 4. Cronograma de receitas (recebimentos mensais) — com breakdown
     # ===================================================================
     receitas = [0.0] * total_meses
-    # Acumuladores por tipo de recebimento
-    acum_entrada = 0.0
-    acum_parcelas = 0.0
-    acum_intermediarias = 0.0
+    # Arrays por tipo de recebimento (para breakdown consistente)
+    rec_entrada = [0.0] * total_meses
+    rec_parcelas = [0.0] * total_meses
+    rec_intermediarias = [0.0] * total_meses
 
     for m in range(total_meses):
         un = unidades_vendas[m] * fator_liquido
@@ -369,69 +369,73 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
         if e_loteamento:
             # Entrada: distribuída em N parcelas
             valor_entrada = valor_venda * tv_entrada_pct
-            acum_entrada += valor_entrada
             for k in range(tv_num_parc_entrada):
                 idx = m + k
                 if idx < total_meses:
-                    receitas[idx] += valor_entrada / tv_num_parc_entrada
+                    v_parc = valor_entrada / tv_num_parc_entrada
+                    receitas[idx] += v_parc
+                    rec_entrada[idx] += v_parc
 
             # Saldo parcelado
             valor_saldo = valor_venda * tv_saldo_pct
-            acum_parcelas += valor_saldo
             inicio_saldo = m + tv_num_parc_entrada
             parcelas_efetivas = min(tv_num_parcelas, total_meses - inicio_saldo)
             if parcelas_efetivas > 0:
                 parcela_mensal = valor_saldo / tv_num_parcelas
                 for k in range(parcelas_efetivas):
                     receitas[inicio_saldo + k] += parcela_mensal
+                    rec_parcelas[inicio_saldo + k] += parcela_mensal
 
             # Intermediárias (anuais)
             if tv_intermediarias_pct > 0:
                 valor_inter = valor_venda * tv_intermediarias_pct
-                acum_intermediarias += valor_inter
-                for ano in range(1, (total_meses - m) // 12 + 1):
+                num_anos = max(1, (total_meses - m) // 12)
+                for ano in range(1, num_anos + 1):
                     idx = m + ano * 12
                     if idx < total_meses:
-                        receitas[idx] += valor_inter / max(1, (total_meses - m) // 12)
+                        v_inter = valor_inter / num_anos
+                        receitas[idx] += v_inter
+                        rec_intermediarias[idx] += v_inter
         else:
             # Incorporação
             # Entrada: no ato da venda
-            acum_entrada += valor_venda * tv_entrada_pct
-            receitas[m] += valor_venda * tv_entrada_pct
+            v_ent = valor_venda * tv_entrada_pct
+            receitas[m] += v_ent
+            rec_entrada[m] += v_ent
 
             # Parcelas durante obra
             valor_parc = valor_venda * tv_parcelas_obra_pct
-            acum_parcelas += valor_parc
             if tv_num_parcelas_obra > 0:
                 mensal = valor_parc / tv_num_parcelas_obra
                 for k in range(1, tv_num_parcelas_obra + 1):
                     idx = m + k
                     if idx < total_meses:
                         receitas[idx] += mensal
+                        rec_parcelas[idx] += mensal
 
             # Financiamento bancário: na entrega das chaves
             financ_valor = valor_venda * tv_financiamento_pct
-            acum_intermediarias += financ_valor
             if mes_entrega < total_meses:
                 receitas[mes_entrega] += financ_valor
+                rec_intermediarias[mes_entrega] += financ_valor
 
             # Reforços: a cada 6 meses até entrega
             if tv_reforcos_pct > 0:
                 valor_ref_total = valor_venda * tv_reforcos_pct
-                acum_intermediarias += valor_ref_total
                 num_reforcos = max(1, (mes_entrega - m) // 6)
                 valor_reforco = valor_ref_total / num_reforcos
                 for r in range(1, num_reforcos + 1):
                     idx = m + r * 6
                     if idx < total_meses:
                         receitas[idx] += valor_reforco
+                        rec_intermediarias[idx] += valor_reforco
 
-    # Receita bruta (antes de inadimplência)
+    # Receita bruta (antes de inadimplência) — breakdown é consistente com total
     receita_bruta_total = sum(receitas)
     sim.receita_bruta = receita_bruta_total
-    sim.receita_entrada = acum_entrada
-    sim.receita_parcelas = acum_parcelas
-    sim.receita_intermediarias = acum_intermediarias
+    sim.receita_entrada = sum(rec_entrada)
+    sim.receita_parcelas = sum(rec_parcelas)
+    sim.receita_intermediarias = sum(rec_intermediarias)
 
     # Aplicar inadimplência sobre receitas (redução)
     sim.valor_inadimplencia = receita_bruta_total * inadimplencia_pct
@@ -609,10 +613,9 @@ def simular(resultado: ResultadoPremissas) -> ResultadoSimulacao:
     sim.custos_mensais = custos
     sim.despesas_mensais = despesas
 
-    # Resultado
-    sim.atividades_operacionais = sim.receita_liquida - sim.impostos_total - sim.custo_total - (
-        sim.despesa_total - sim.impostos_total)  # impostos já estão em despesa_total
+    # Resultado (despesa_total já inclui tributária)
     sim.resultado_projeto = sim.receita_liquida - sim.custo_total - sim.despesa_total
+    sim.atividades_operacionais = sim.resultado_projeto
 
     # Margens
     if vgv > 0:
