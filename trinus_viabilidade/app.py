@@ -151,11 +151,29 @@ with st.sidebar:
     # Carregar credenciais automaticamente do secrets.toml (se existir)
     _sb_url_default = ""
     _sb_key_default = ""
+    # Tentativa 1: st.secrets (Streamlit nativo)
     try:
-        _sb_url_default = st.secrets.get("supabase", {}).get("url", "")
-        _sb_key_default = st.secrets.get("supabase", {}).get("key", "")
+        _sb_url_default = st.secrets["supabase"]["url"]
+        _sb_key_default = st.secrets["supabase"]["key"]
     except Exception:
         pass
+    # Tentativa 2: ler direto do arquivo secrets.toml (fallback)
+    if not _sb_url_default:
+        try:
+            import tomllib
+            for _secrets_path in [
+                Path(__file__).parent / ".streamlit" / "secrets.toml",
+                Path(__file__).parent.parent / ".streamlit" / "secrets.toml",
+            ]:
+                if _secrets_path.exists():
+                    with open(_secrets_path, "rb") as _f:
+                        _secrets_data = tomllib.load(_f)
+                    _sb_url_default = _secrets_data.get("supabase", {}).get("url", "")
+                    _sb_key_default = _secrets_data.get("supabase", {}).get("key", "")
+                    if _sb_url_default:
+                        break
+        except Exception:
+            pass
 
     # Preencher session_state na primeira carga (automático)
     if "supabase_url" not in st.session_state and _sb_url_default:
