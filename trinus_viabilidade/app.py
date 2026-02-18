@@ -892,8 +892,8 @@ elif st.session_state["etapa"] == 3:
         )
 
         # Tabs por categoria
-        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas, tab_resumo_dfc, tab_simulacao, tab_dfc_aberto = st.tabs(
-            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas", "Resumo DFC", "Simulacao", "DFC Aberto"]
+        tab_receita, tab_custo, tab_despesa, tab_financeiro, tab_vendas, tab_resumo_dfc, tab_simulacao, tab_dfc_aberto, tab_chat = st.tabs(
+            ["Receita", "Custo", "Despesa", "Financeiro", "Tabela de Vendas", "Resumo DFC", "Simulacao", "DFC Aberto", "Chat"]
         )
 
         editadas = st.session_state.get("premissas_editadas", {})
@@ -1672,6 +1672,117 @@ elif st.session_state["etapa"] == 3:
                             mime="text/csv",
                             use_container_width=True,
                         )
+
+        # --- Chat com o cliente ---
+        with tab_chat:
+            st.subheader("Chat — Tire dúvidas sobre as premissas")
+
+            api_key = st.session_state.get("anthropic_api_key", "")
+            if not api_key:
+                st.info(
+                    "Para usar o chat, informe a **chave da API Anthropic** "
+                    "na barra lateral (seção IA)."
+                )
+            else:
+                # Inicializar histórico
+                if "chat_messages" not in st.session_state:
+                    st.session_state["chat_messages"] = []
+
+                # Montar contexto do estudo para o system prompt
+                _inp = resultado.inputs
+                _sim = st.session_state.get("sim_dfc")
+
+                _ctx_premissas = "\n".join(
+                    f"- {p.nome}: {p.valor:.2f} {p.unidade} "
+                    f"(faixa: {p.valor_min:.2f}–{p.valor_max:.2f}) — {p.fonte}"
+                    for p in resultado.premissas
+                )
+
+                _ctx_indicadores = ""
+                if _sim:
+                    _ctx_indicadores = (
+                        f"\n\nINDICADORES DA SIMULAÇÃO:\n"
+                        f"- VGV: R$ {_sim.vgv:,.0f}\n"
+                        f"- Receita líquida: R$ {_sim.receita_liquida:,.0f}\n"
+                        f"- Custo total: R$ {_sim.custo_total:,.0f}\n"
+                        f"- Despesa total: R$ {_sim.despesa_total:,.0f}\n"
+                        f"- Resultado do projeto: R$ {_sim.resultado_projeto:,.0f}\n"
+                        f"- Margem sobre VGV: {_sim.margem_vgv:.1f}%\n"
+                        f"- TIR anual: {_sim.tir_anual:.1f}%\n"
+                        f"- VPL: R$ {_sim.vpl:,.0f}\n"
+                        f"- Payback: {_sim.payback_meses} meses\n"
+                        f"- Exposição máxima: R$ {_sim.exposicao_maxima:,.0f}\n"
+                    )
+
+                _ctx_ia = ""
+                _ia_meta = st.session_state.get("ia_metadata", {})
+                if _ia_meta.get("insights"):
+                    _ctx_ia = "\n\nINSIGHTS DA IA:\n" + "\n".join(
+                        f"- {i}" for i in _ia_meta["insights"]
+                    )
+                if _ia_meta.get("recomendacoes"):
+                    _ctx_ia += "\n\nRECOMENDAÇÕES DA IA:\n" + "\n".join(
+                        f"- {r}" for r in _ia_meta["recomendacoes"]
+                    )
+
+                _system_chat = (
+                    "Você é um consultor especialista em viabilidade imobiliária da Trinus Co. "
+                    "Seu papel é tirar dúvidas do cliente sobre as premissas e indicadores "
+                    "do estudo de viabilidade que está sendo elaborado.\n\n"
+                    "Responda de forma clara, objetiva e didática. Use exemplos práticos "
+                    "quando possível. Se o cliente perguntar algo fora do escopo do estudo, "
+                    "redirecione educadamente para as premissas.\n\n"
+                    "DADOS DO EMPREENDIMENTO:\n"
+                    f"- Tipologia: {_inp.tipologia.value}\n"
+                    f"- Padrão: {_inp.padrao.value}\n"
+                    f"- Cidade/Estado: {_inp.cidade}/{_inp.estado}\n"
+                    f"- Unidades: {_inp.num_unidades}\n"
+                    f"- Tipo de negociação: {_inp.tipo_negociacao.value}\n\n"
+                    f"PREMISSAS DO ESTUDO:\n{_ctx_premissas}"
+                    f"{_ctx_indicadores}"
+                    f"{_ctx_ia}\n\n"
+                    "Responda sempre em português do Brasil."
+                )
+
+                # Renderizar histórico
+                for msg in st.session_state["chat_messages"]:
+                    with st.chat_message(msg["role"]):
+                        st.markdown(msg["content"])
+
+                # Input do usuário
+                if user_input := st.chat_input("Pergunte sobre as premissas..."):
+                    st.session_state["chat_messages"].append(
+                        {"role": "user", "content": user_input}
+                    )
+                    with st.chat_message("user"):
+                        st.markdown(user_input)
+
+                    # Chamar a API
+                    with st.chat_message("assistant"):
+                        with st.spinner("Pensando..."):
+                            try:
+                                from anthropic import Anthropic
+
+                                _chat_client = Anthropic(api_key=api_key)
+                                _chat_resp = _chat_client.messages.create(
+                                    model="claude-sonnet-4-5-20250929",
+                                    system=_system_chat,
+                                    messages=[
+                                        {"role": m["role"], "content": m["content"]}
+                                        for m in st.session_state["chat_messages"]
+                                    ],
+                                    temperature=0.4,
+                                    max_tokens=2000,
+                                )
+                                _reply = _chat_resp.content[0].text
+                            except Exception as _chat_err:
+                                _reply = f"Erro ao gerar resposta: {_chat_err}"
+
+                        st.markdown(_reply)
+
+                    st.session_state["chat_messages"].append(
+                        {"role": "assistant", "content": _reply}
+                    )
 
         st.markdown("---")
 
