@@ -29,6 +29,15 @@ from modelos import (
 )
 from engine import gerar_premissas
 from engine_ia import gerar_premissas_com_ia
+from supabase_client import (
+    get_client as get_supabase_client,
+    salvar_estudo,
+    atualizar_status,
+    salvar_simulacao,
+    buscar_casos_similares,
+    buscar_estatisticas,
+    formatar_contexto_rag,
+)
 from exportador import (
     exportar_excel_bytes,
     exportar_json_bytes,
@@ -133,13 +142,55 @@ with st.sidebar:
         )
 
     st.markdown("---")
+
+    # -----------------------------------------------------------------------
+    # Integração com Supabase (base de conhecimento)
+    # -----------------------------------------------------------------------
+    st.subheader("Base de Conhecimento")
+    supabase_url = st.text_input(
+        "Supabase URL",
+        key="supabase_url",
+        help="URL do projeto Supabase. Ex: https://xyz.supabase.co",
+    )
+    supabase_key = st.text_input(
+        "Supabase Anon Key",
+        type="password",
+        key="supabase_key",
+        help="Chave anon/public do projeto Supabase.",
+    )
+    if supabase_url and supabase_key:
+        st.success("Supabase conectado — base de conhecimento ativa")
+    else:
+        st.info("Configure o Supabase para ativar a base de conhecimento e retroalimentação.")
+
+    st.markdown("---")
     if st.button("Recomeçar", use_container_width=True):
         api_key_backup = st.session_state.get("anthropic_api_key", "")
+        sb_url_backup = st.session_state.get("supabase_url", "")
+        sb_key_backup = st.session_state.get("supabase_key", "")
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         if api_key_backup:
             st.session_state["anthropic_api_key"] = api_key_backup
+        if sb_url_backup:
+            st.session_state["supabase_url"] = sb_url_backup
+        if sb_key_backup:
+            st.session_state["supabase_key"] = sb_key_backup
         st.rerun()
+
+# ---------------------------------------------------------------------------
+# Helper: obter cliente Supabase (ou None)
+# ---------------------------------------------------------------------------
+def _get_supabase():
+    """Retorna cliente Supabase se configurado, senão None."""
+    url = st.session_state.get("supabase_url", "")
+    key = st.session_state.get("supabase_key", "")
+    if url and key:
+        try:
+            return get_supabase_client(url, key)
+        except Exception:
+            return None
+    return None
 
 # ---------------------------------------------------------------------------
 # Título
@@ -517,6 +568,26 @@ elif st.session_state["etapa"] == 2:
             with st.spinner("Gerando premissas com base nos benchmarks de mercado..."):
                 resultado = gerar_premissas(inputs)
 
+            # Buscar contexto da base de conhecimento (retroalimentação)
+            contexto_rag = ""
+            sb = _get_supabase()
+            if sb:
+                try:
+                    with st.spinner("Buscando dados históricos da base de conhecimento..."):
+                        casos = buscar_casos_similares(
+                            sb, inputs.cidade, inputs.estado,
+                            inputs.tipologia.value, inputs.padrao.value,
+                        )
+                        stats = buscar_estatisticas(
+                            sb, inputs.cidade, inputs.estado,
+                            inputs.tipologia.value,
+                        )
+                        contexto_rag = formatar_contexto_rag(casos, stats)
+                        if casos:
+                            st.session_state["_rag_casos_count"] = len(casos)
+                except Exception:
+                    contexto_rag = ""
+
             # Enriquecer com IA se API Key disponível
             ia_metadata = None
             api_key = st.session_state.get("anthropic_api_key", "")
@@ -524,7 +595,20 @@ elif st.session_state["etapa"] == 2:
                 with st.spinner("Refinando premissas com IA... Isso pode levar alguns segundos."):
                     resultado, ia_metadata = gerar_premissas_com_ia(
                         inputs, resultado, api_key,
+                        contexto_historico=contexto_rag,
                     )
+
+            # Salvar estudo na base de conhecimento
+            if sb:
+                try:
+                    estudo_id = salvar_estudo(
+                        sb, resultado,
+                        ia_metadata=ia_metadata,
+                        status="gerado",
+                    )
+                    st.session_state["estudo_id"] = estudo_id
+                except Exception:
+                    pass  # Não bloquear o fluxo se Supabase falhar
 
             st.session_state["resultado"] = resultado
             st.session_state["ia_metadata"] = ia_metadata
@@ -1042,6 +1126,16 @@ elif st.session_state["etapa"] == 3:
 
             # Executar simulação
             sim = simular(resultado, datas_macro=st.session_state.get("datas_macro"))
+
+            # Salvar simulação na base de conhecimento
+            _sb = _get_supabase()
+            _eid = st.session_state.get("estudo_id")
+            if _sb and _eid and sim.vgv > 0:
+                try:
+                    salvar_simulacao(_sb, _eid, sim)
+                    atualizar_status(_sb, _eid, "simulado")
+                except Exception:
+                    pass
 
             if sim.vgv <= 0:
                 st.warning("Preencha o VGV estimado para gerar a simulação.")
@@ -1584,6 +1678,15 @@ elif st.session_state["etapa"] == 4:
         # Botões de exportação
         st.subheader("Formatos de Exportação")
         col_exp1, col_exp2, col_exp3 = st.columns(3)
+
+        # Salvar estado final na base de conhecimento
+        _sb = _get_supabase()
+        _eid = st.session_state.get("estudo_id")
+        if _sb and _eid:
+            try:
+                atualizar_status(_sb, _eid, "exportado")
+            except Exception:
+                pass
 
         with col_exp1:
             # Incluir DFC Aberto no Excel se simulação disponível

@@ -93,6 +93,7 @@ REGRAS IMPORTANTES:
 def _build_user_prompt(
     inputs: InputsUsuario,
     resultado: ResultadoPremissas,
+    contexto_historico: str = "",
 ) -> str:
     """Constrói o prompt do usuário com os dados do empreendimento."""
     premissas_text = ""
@@ -111,6 +112,18 @@ def _build_user_prompt(
     if inputs.valor_aquisicao is not None:
         negociacao_detalhes += f", Valor: R$ {inputs.valor_aquisicao:,.2f}"
 
+    # Bloco de contexto histórico (RAG + estatísticas)
+    bloco_historico = ""
+    if contexto_historico:
+        bloco_historico = f"""
+
+{contexto_historico}
+IMPORTANTE: Use os dados históricos acima como referência adicional para \
+calibrar suas sugestões. Dê peso especial aos estudos da mesma cidade e \
+tipologia. As estatísticas agregadas refletem o comportamento real dos \
+usuários ao ajustar premissas — considere as medianas como ponto de partida.
+"""
+
     prompt = f"""Analise o seguinte empreendimento imobiliário e ajuste as premissas:
 
 DADOS DO EMPREENDIMENTO:
@@ -127,7 +140,7 @@ DADOS DO EMPREENDIMENTO:
 
 PREMISSAS ATUAIS (baseadas em benchmarks estáticos de mercado):
 {premissas_text}
-
+{bloco_historico}
 Analise estas premissas considerando o mercado imobiliário de \
 {inputs.cidade}/{inputs.estado} e ajuste os valores conforme seu \
 conhecimento especializado. Retorne o JSON conforme especificado."""
@@ -138,9 +151,14 @@ def gerar_premissas_com_ia(
     inputs: InputsUsuario,
     resultado_base: ResultadoPremissas,
     api_key: str,
+    contexto_historico: str = "",
 ) -> tuple[ResultadoPremissas, dict]:
     """
     Enriquece premissas usando IA (Anthropic Claude API).
+
+    Args:
+        contexto_historico: Texto com casos similares e estatísticas da base
+            de conhecimento (retroalimentação).
 
     Returns:
         Tupla (resultado_ajustado, ia_metadata) com insights e recomendações.
@@ -153,7 +171,7 @@ def gerar_premissas_com_ia(
         }
 
     client = Anthropic(api_key=api_key)
-    user_prompt = _build_user_prompt(inputs, resultado_base)
+    user_prompt = _build_user_prompt(inputs, resultado_base, contexto_historico)
 
     try:
         response = client.messages.create(
