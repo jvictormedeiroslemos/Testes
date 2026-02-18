@@ -147,21 +147,52 @@ with st.sidebar:
     # Integração com Supabase (base de conhecimento)
     # -----------------------------------------------------------------------
     st.subheader("Base de Conhecimento")
-    supabase_url = st.text_input(
-        "Supabase URL",
-        key="supabase_url",
-        help="URL do projeto Supabase. Ex: https://xyz.supabase.co",
-    )
-    supabase_key = st.text_input(
-        "Supabase Anon Key",
-        type="password",
-        key="supabase_key",
-        help="Chave anon/public do projeto Supabase.",
-    )
-    if supabase_url and supabase_key:
+
+    # Carregar credenciais automaticamente do secrets.toml (se existir)
+    _sb_url_default = ""
+    _sb_key_default = ""
+    try:
+        _sb_url_default = st.secrets.get("supabase", {}).get("url", "")
+        _sb_key_default = st.secrets.get("supabase", {}).get("key", "")
+    except Exception:
+        pass
+
+    # Preencher session_state na primeira carga (automático)
+    if "supabase_url" not in st.session_state and _sb_url_default:
+        st.session_state["supabase_url"] = _sb_url_default
+    if "supabase_key" not in st.session_state and _sb_key_default:
+        st.session_state["supabase_key"] = _sb_key_default
+
+    _sb_url_atual = st.session_state.get("supabase_url", "")
+    _sb_key_atual = st.session_state.get("supabase_key", "")
+
+    if _sb_url_atual and _sb_key_atual:
         st.success("Supabase conectado — base de conhecimento ativa")
+        with st.expander("Alterar credenciais Supabase", expanded=False):
+            st.text_input(
+                "Supabase URL",
+                key="supabase_url",
+                help="URL do projeto Supabase.",
+            )
+            st.text_input(
+                "Supabase Anon Key",
+                type="password",
+                key="supabase_key",
+                help="Chave anon/public do projeto Supabase.",
+            )
     else:
-        st.info("Configure o Supabase para ativar a base de conhecimento e retroalimentação.")
+        st.info("Configure o Supabase para ativar a base de conhecimento.")
+        st.text_input(
+            "Supabase URL",
+            key="supabase_url",
+            help="URL do projeto Supabase. Ex: https://xyz.supabase.co",
+        )
+        st.text_input(
+            "Supabase Anon Key",
+            type="password",
+            key="supabase_key",
+            help="Chave anon/public do projeto Supabase.",
+        )
 
     st.markdown("---")
     if st.button("Recomeçar", use_container_width=True):
