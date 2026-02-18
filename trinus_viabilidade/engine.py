@@ -373,19 +373,26 @@ def _gerar_premissas_custo(
                 descricao="Custo total estimado de infraestrutura",
             ))
 
-    # Custo do terreno (% VGV)
-    ref_terreno = CUSTO_TERRENO_PCT_VGV[inputs.tipo_negociacao][inputs.padrao]
-    resultado.premissas.append(Premissa(
-        nome="Custo do terreno (% VGV)",
-        valor=ref_terreno["medio"],
-        unidade="% do VGV",
-        valor_min=ref_terreno["min"],
-        valor_max=ref_terreno["max"],
-        fonte="Práticas de mercado por tipo de negociação",
-        categoria="Custo",
-        subcategoria="Terreno",
-        descricao=f"Custo do terreno como percentual do VGV ({inputs.tipo_negociacao.value})",
-    ))
+    # Custo do terreno (% VGV) — só exibe quando for Aquisição.
+    # Para permutas, o percentual já foi informado pelo usuário no preenchimento inicial.
+    _eh_permuta = inputs.tipo_negociacao in (
+        TipoNegociacao.PERMUTA_FISICA,
+        TipoNegociacao.PERMUTA_FINANCEIRA,
+        TipoNegociacao.PERMUTA_RESULTADO,
+    )
+    if not _eh_permuta:
+        ref_terreno = CUSTO_TERRENO_PCT_VGV[inputs.tipo_negociacao][inputs.padrao]
+        resultado.premissas.append(Premissa(
+            nome="Custo do terreno (% VGV)",
+            valor=ref_terreno["medio"],
+            unidade="% do VGV",
+            valor_min=ref_terreno["min"],
+            valor_max=ref_terreno["max"],
+            fonte="Práticas de mercado por tipo de negociação",
+            categoria="Custo",
+            subcategoria="Terreno",
+            descricao=f"Custo do terreno como percentual do VGV ({inputs.tipo_negociacao.value})",
+        ))
 
     # BDI / Taxa de administração de obra
     ref_bdi = BDI_ADMINISTRACAO_OBRA[inputs.padrao]
@@ -609,8 +616,15 @@ def _gerar_premissas_despesa(
         descricao=descricao_trib,
     ))
 
-    # Taxas cartoriais
+    # Taxas cartoriais — ITBI só se aplica em aquisição (não incide em permuta)
+    _eh_permuta_desp = inputs.tipo_negociacao in (
+        TipoNegociacao.PERMUTA_FISICA,
+        TipoNegociacao.PERMUTA_FINANCEIRA,
+        TipoNegociacao.PERMUTA_RESULTADO,
+    )
     for tipo_taxa, info in TAXAS_CARTORARIAS.items():
+        if tipo_taxa == "itbi_terreno" and _eh_permuta_desp:
+            continue  # ITBI não incide em permuta
         unidade = "% do VGV" if tipo_taxa != "itbi_terreno" else "% valor terreno"
         resultado.premissas.append(Premissa(
             nome=info["descricao"],

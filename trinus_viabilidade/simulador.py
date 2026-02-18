@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from modelos import ResultadoPremissas, Tipologia, DatasMacro
+from modelos import ResultadoPremissas, Tipologia, TipoNegociacao, DatasMacro
 from dados_mercado import CURVA_DESEMBOLSO
 
 
@@ -291,7 +291,16 @@ def simular(resultado: ResultadoPremissas, datas_macro: DatasMacro | None = None
     inadimplencia_pct = _get_premissa_valor(resultado, "Taxa de inadimplência estimada", 5) / 100
 
     # Custos
-    terreno_pct_vgv = _get_premissa_valor(resultado, "Custo do terreno (% VGV)") / 100
+    # Para permuta o percentual já veio do preenchimento inicial do cliente
+    _eh_permuta = inputs.tipo_negociacao in (
+        TipoNegociacao.PERMUTA_FISICA,
+        TipoNegociacao.PERMUTA_FINANCEIRA,
+        TipoNegociacao.PERMUTA_RESULTADO,
+    )
+    if _eh_permuta and inputs.permuta_percentual is not None:
+        terreno_pct_vgv = inputs.permuta_percentual / 100
+    else:
+        terreno_pct_vgv = _get_premissa_valor(resultado, "Custo do terreno (% VGV)") / 100
     bdi_pct = _get_premissa_valor(resultado, "Taxa de administração de obra (BDI)") / 100
     projetos_pct = _get_premissa_valor(resultado, "Custo de projetos e consultorias") / 100
     aprovacoes_pct = _get_premissa_valor(resultado, "Custo de aprovações e licenças") / 100
@@ -321,7 +330,11 @@ def simular(resultado: ResultadoPremissas, datas_macro: DatasMacro | None = None
     # Cartoriais
     ri_pct = _get_premissa_valor(resultado, "Registro de incorporação / loteamento") / 100
     escrituras_pct = _get_premissa_valor(resultado, "Custos com escrituras e registros do imóvel") / 100
-    itbi_pct = _get_premissa_valor(resultado, "ITBI sobre aquisição do terreno (% valor terreno)") / 100
+    # ITBI não incide em permuta (não há aquisição)
+    if _eh_permuta:
+        itbi_pct = 0.0
+    else:
+        itbi_pct = _get_premissa_valor(resultado, "ITBI sobre aquisição do terreno (% valor terreno)") / 100
 
     # Financeiro
     tma_anual = _get_premissa_valor(resultado, "Taxa Mínima de Atratividade (TMA)", 15) / 100
@@ -1000,7 +1013,15 @@ def gerar_diagnostico(
     # ===================================================================
 
     # --- Terreno ---
-    terreno_pct = _get_premissa_valor(resultado, "Custo do terreno (% VGV)", 0)
+    _eh_permuta_diag = resultado.inputs.tipo_negociacao in (
+        TipoNegociacao.PERMUTA_FISICA,
+        TipoNegociacao.PERMUTA_FINANCEIRA,
+        TipoNegociacao.PERMUTA_RESULTADO,
+    )
+    if _eh_permuta_diag and resultado.inputs.permuta_percentual is not None:
+        terreno_pct = resultado.inputs.permuta_percentual
+    else:
+        terreno_pct = _get_premissa_valor(resultado, "Custo do terreno (% VGV)", 0)
     bench_terreno = 15.0
     if terreno_pct > 22:
         itens.append(ItemDiagnostico(
