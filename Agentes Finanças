@@ -1,1 +1,13 @@
+Criação de um Sistema Financeiro Modular com múltiplos Agentes Especialistas coordenados por um Master Orquestrador. O projeto tem como objetivo estruturar minha vida financeira de forma estratégica e orientada a longo prazo, permitindo análise contínua de receitas, gastos, dívidas, reserva e investimentos.
 
+O sistema será composto por:
+
+* Agente de Diagnóstico & Métricas
+* Agente de Orçamento & Redução de Custos
+* Agente de Dívidas & Renegociação
+* Agente de Estratégia de Investimentos
+* Agente de Rotina & Auditoria Financeira
+* Master Agent Orquestrador (coordenação estratégica)
+
+
+Objetivo final: eliminar desorganização financeira, criar reserva sólida, reduzir juros, investir com consistência e construir liberdade financeira através de um sistema disciplinado e orientado por dados.
