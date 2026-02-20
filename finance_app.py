@@ -20,7 +20,17 @@ st.set_page_config(
 )
 
 DATA_FILE = Path("data/financial_data.json")
-DATA_FILE.parent.mkdir(exist_ok=True)
+try:
+    DATA_FILE.parent.mkdir(exist_ok=True)
+except Exception:
+    DATA_FILE = None  # Streamlit Cloud: usar apenas session_state
+
+# Lê API key dos secrets do Streamlit Cloud (se configurado)
+_secret_api_key = ""
+try:
+    _secret_api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+except Exception:
+    pass
 
 AGENT_LABELS = {
     "diagnostico": ("🩺", "Diagnóstico & Métricas"),
@@ -35,7 +45,7 @@ AGENT_LABELS = {
 # Persistência de dados
 # ---------------------------------------------------------------------------
 def load_data() -> dict:
-    if DATA_FILE.exists():
+    if DATA_FILE and DATA_FILE.exists():
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {
@@ -49,8 +59,12 @@ def load_data() -> dict:
 
 
 def save_data(data: dict):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    if DATA_FILE:
+        try:
+            with open(DATA_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass  # No Streamlit Cloud os dados ficam apenas na sessão
 
 
 # ---------------------------------------------------------------------------
@@ -81,11 +95,15 @@ st.markdown("---")
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("⚙️ Configuração")
-    api_key = st.text_input(
-        "Anthropic API Key:",
-        type="password",
-        help="Obtenha em console.anthropic.com",
-    )
+    if _secret_api_key:
+        api_key = _secret_api_key
+        st.success("🔑 API Key carregada dos secrets")
+    else:
+        api_key = st.text_input(
+            "Anthropic API Key:",
+            type="password",
+            help="Obtenha em console.anthropic.com",
+        )
 
     st.markdown("---")
     st.markdown("### 🤖 Agentes do Sistema")
