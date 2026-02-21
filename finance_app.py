@@ -5,10 +5,7 @@ Uso:
     streamlit run finance_app.py
 """
 
-import hashlib
-import hmac
 import json
-import time
 from pathlib import Path
 
 import streamlit as st
@@ -71,103 +68,6 @@ def save_data(data: dict):
 
 
 # ---------------------------------------------------------------------------
-# Autenticação e Segurança
-# ---------------------------------------------------------------------------
-_MAX_TENTATIVAS = 5
-_TEMPO_BLOQUEIO = 300  # 5 minutos em segundos
-
-
-def _get_hash_senha() -> str:
-    """Obtém o hash SHA-256 da senha configurada nos secrets do Streamlit."""
-    try:
-        return st.secrets.get("PASSWORD_HASH", "")
-    except Exception:
-        return ""
-
-
-def verificar_autenticacao() -> bool:
-    """
-    Exibe tela de login e verifica autenticação.
-    Retorna True se o usuário já está autenticado.
-    Interrompe o app (st.stop) caso não esteja.
-    """
-    if st.session_state.get("autenticado", False):
-        return True
-
-    hash_senha = _get_hash_senha()
-
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown("## 🔐 Acesso Restrito")
-        st.markdown(
-            "Este sistema contém **dados financeiros pessoais e sigilosos**. "
-            "Apenas usuários autorizados podem acessar."
-        )
-        st.markdown("---")
-
-        if not hash_senha:
-            st.error("⚠️ Configuração de segurança ausente.")
-            st.info(
-                "Configure `PASSWORD_HASH` nos secrets do Streamlit.  \n"
-                "Execute o script abaixo para gerar o hash da sua senha:  \n"
-                "```\npython generate_password_hash.py\n```"
-            )
-            st.stop()
-
-        tentativas = st.session_state.get("tentativas_falhas", 0)
-        bloqueado_ate = st.session_state.get("bloqueado_ate", 0.0)
-
-        if time.time() < bloqueado_ate:
-            restante = int(bloqueado_ate - time.time())
-            minutos, segundos = divmod(restante, 60)
-            st.error(
-                f"🔒 Acesso bloqueado por excesso de tentativas.  \n"
-                f"Aguarde **{minutos}m {segundos:02d}s** para tentar novamente."
-            )
-            st.stop()
-
-        if bloqueado_ate > 0 and time.time() >= bloqueado_ate:
-            st.session_state["tentativas_falhas"] = 0
-            st.session_state["bloqueado_ate"] = 0.0
-            tentativas = 0
-
-        with st.form("form_login"):
-            senha = st.text_input("🔑 Senha:", type="password")
-            entrar = st.form_submit_button("Entrar", use_container_width=True)
-
-        if entrar:
-            hash_digitado = hashlib.sha256(senha.encode()).hexdigest()
-            if hmac.compare_digest(hash_digitado, hash_senha):
-                st.session_state["autenticado"] = True
-                st.session_state["tentativas_falhas"] = 0
-                st.session_state["bloqueado_ate"] = 0.0
-                st.rerun()
-            else:
-                novas_tentativas = tentativas + 1
-                st.session_state["tentativas_falhas"] = novas_tentativas
-                if novas_tentativas >= _MAX_TENTATIVAS:
-                    st.session_state["bloqueado_ate"] = time.time() + _TEMPO_BLOQUEIO
-                    st.error(
-                        f"🔒 Muitas tentativas incorretas. "
-                        f"Acesso bloqueado por {_TEMPO_BLOQUEIO // 60} minutos."
-                    )
-                else:
-                    restantes = _MAX_TENTATIVAS - novas_tentativas
-                    st.error(
-                        f"❌ Senha incorreta. {restantes} tentativa(s) restante(s)."
-                    )
-
-    return False
-
-
-# ---------------------------------------------------------------------------
-# Verificação de autenticação — bloqueia o app se não autenticado
-# ---------------------------------------------------------------------------
-if not verificar_autenticacao():
-    st.stop()
-
-
-# ---------------------------------------------------------------------------
 # Inicialização do session state
 # ---------------------------------------------------------------------------
 if "financial_data" not in st.session_state:
@@ -195,12 +95,6 @@ st.markdown("---")
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("⚙️ Configuração")
-
-    if st.button("🚪 Sair", use_container_width=True, type="secondary"):
-        st.session_state["autenticado"] = False
-        st.rerun()
-
-    st.markdown("---")
 
     if _secret_api_key:
         api_key = _secret_api_key
